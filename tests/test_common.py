@@ -11,6 +11,7 @@ from typing import Optional
 from typing import Union
 
 from ktoolbox import common
+from ktoolbox import host
 
 from ktoolbox.common import enum_convert
 from ktoolbox.common import enum_convert_list
@@ -1200,3 +1201,8 @@ def test_structparse_pop_objlist_as_dict() -> None:
             "foo",
             construct=lambda yamlidx2, yamlpath2, arg: str(arg),
         )
+
+
+def test_future_thread() -> None:
+    thread = common.FutureThread(lambda th: host.local.run("echo hi"), start=True)
+    assert thread.join_and_result() == host.Result("hi\n", "", 0)

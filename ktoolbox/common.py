@@ -13,6 +13,7 @@ import typing
 
 from collections.abc import Iterable
 from collections.abc import Mapping
+from concurrent.futures import Future
 from dataclasses import dataclass
 from dataclasses import fields
 from dataclasses import is_dataclass
@@ -1533,3 +1534,59 @@ class Cancellable:
                 if self._event.is_set():
                     os.write(self._write_fd, b"1")
             return self._read_fd
+
+
+class FutureThread(threading.Thread, typing.Generic[T1]):
+    def __init__(
+        self,
+        func: typing.Callable[["FutureThread[T1]"], T1],
+        *,
+        start: bool = False,
+        cancellable: Optional[Cancellable] = None,
+    ):
+        super().__init__()
+        self._lock = threading.Lock()
+        self._func = func
+        self.future: Future[T1] = Future()
+        self._cancellable = cancellable
+        self._cancellable_is_cancelled = False
+        self._user_data: Any = None
+        if start:
+            self.start()
+
+    @property
+    def cancellable(self) -> Cancellable:
+        with self._lock:
+            if self._cancellable is None:
+                self._cancellable = Cancellable()
+                if self._cancellable_is_cancelled:
+                    self._cancellable.cancel()
+            return self._cancellable
+
+    @property
+    def user_data(self) -> Any:
+        with self._lock:
+            return self._user_data
+
+    def set_user_data(self, data: Any) -> Any:
+        with self._lock:
+            old = self._user_data
+            self._user_data = data
+            return old
+
+    def run(self) -> None:
+        try:
+            result = self._func(self)
+            self.future.set_result(result)
+        except BaseException as e:
+            self.future.set_exception(e)
+
+    def join_and_result(self, *, cancel: bool = False) -> T1:
+        if cancel:
+            with self._lock:
+                if self._cancellable is not None:
+                    self._cancellable.cancel()
+                else:
+                    self._cancellable_is_cancelled = True
+        self.join()
+        return self.future.result()
