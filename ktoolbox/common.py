@@ -1486,3 +1486,50 @@ class ExtendedLogger(logging.Logger):
     def error_and_exit(self, msg: str, *, exit_code: int = -1) -> typing.NoReturn:
         self.error(msg)
         sys.exit(exit_code)
+
+
+class Cancellable:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._event = threading.Event()
+        self._read_fd = -1
+        self._write_fd = -1
+
+    def __del__(self) -> None:
+        if self._read_fd != -1:
+            os.close(self._read_fd)
+            os.close(self._write_fd)
+
+    @staticmethod
+    def is_cancelled(self: Optional["Cancellable"]) -> bool:
+        return self is not None and self.cancelled
+
+    def cancel(self) -> bool:
+        with self._lock:
+            if self._event.is_set():
+                return False
+            self._event.set()
+            if self._read_fd != -1:
+                os.write(self._write_fd, b"1")
+        return True
+
+    @property
+    def cancelled(self) -> bool:
+        return self._event.is_set()
+
+    def wait_cancelled(self, timeout: Optional[float] = None) -> bool:
+        return self._event.wait(timeout)
+
+    def get_poll_fd(self) -> int:
+        """
+        Get a file descriptor to poll/select on. The descriptor will be
+        ready to read when the cancellable is cancelled.
+
+        Do not actually read from the descriptor. Only poll/select.
+        """
+        with self._lock:
+            if self._read_fd == -1:
+                self._read_fd, self._write_fd = os.pipe()
+                if self._event.is_set():
+                    os.write(self._write_fd, b"1")
+            return self._read_fd
