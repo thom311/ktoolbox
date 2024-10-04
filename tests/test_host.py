@@ -6,13 +6,18 @@ import pytest
 import random
 import re
 import sys
+import time
 
 from collections.abc import Mapping
 from typing import Any
 from typing import Optional
 from typing import Union
 
+from ktoolbox import common
 from ktoolbox import host
+
+
+common.log_config_logger(logging.DEBUG, "ktoolbox")
 
 
 def rnd_run_extraargs() -> dict[str, Any]:
@@ -31,7 +36,45 @@ def rnd_run_extraargs() -> dict[str, Any]:
     if val is not None:
         args["log_lineoutput"] = val
 
+    r = random.randint(0, 2)
+    if r == 0:
+        pass
+    elif r == 1:
+        args["cancellable"] = None
+    else:
+        args["cancellable"] = common.Cancellable()
     return args
+
+
+def rnd_delay(max_delay: float) -> Optional[float]:
+    x_percent = max_delay / 10.0
+    val = random.random() * (max_delay + 2 * x_percent) - 2 * x_percent
+    if val < -x_percent:
+        return None
+    if val <= 0.0:
+        return 0.0
+    return min(max_delay, val)
+
+
+def rnd_sleep(max_delay: float) -> None:
+    delay = rnd_delay(max_delay)
+    if delay is not None:
+        time.sleep(delay)
+
+
+def rnd_cancel_in_background(delay: float = 0) -> common.Cancellable:
+    cancellable = common.Cancellable()
+
+    if random.random() < 0.07:
+        cancellable.cancel()
+    else:
+
+        def _run(th: common.FutureThread[None]) -> None:
+            rnd_sleep(delay)
+            cancellable.cancel()
+
+        common.FutureThread(_run, start=True)
+    return cancellable
 
 
 @functools.cache
@@ -402,3 +445,176 @@ def test_remotehost_sudo() -> None:
     else:
         assert res.out == ""
         assert "sudo" in res.err
+
+
+def _test_cancellable(rsh: host.Host) -> None:
+    bin_res = rsh.run("sleep 5", text=False, cancellable=rnd_cancel_in_background(0.1))
+    if bin_res != host.BinResult.CANCELLED:
+        if isinstance(rsh, host.RemoteHost):
+            assert bin_res == host.BinResult(b"", b"", -1, cancelled=True)
+        else:
+            assert bin_res == host.BinResult(b"", b"", -15, cancelled=True)
+
+    res = rsh.run(
+        [
+            "bash",
+            "-c",
+            '_handle_term() { echo hi trapped; test -n "$pid" && kill "$pid"; exit 4; } ; trap _handle_term TERM; sleep 5 & pid=$!; wait $pid;',
+        ],
+        cancellable=rnd_cancel_in_background(0.1),
+    )
+    if res != host.Result.CANCELLED:
+        if isinstance(rsh, host.RemoteHost):
+            assert res == host.Result("", "", -1, cancelled=True)
+        else:
+            assert res == host.Result(
+                "hi trapped\n", "", 4, cancelled=True
+            ) or res == host.Result("", "", -15, cancelled=True)
+
+    res = rsh.run("cat", cancellable=rnd_cancel_in_background(0.1))
+    if res == host.Result("", "", 0):
+        # We redirect /dev/null into the process, which causes cat to quit right
+        # way. In this case, the process quit before we cancelled it. We are good.
+        pass
+    elif res == host.Result.CANCELLED:
+        # Cancelled before we could start the process. Also good.
+        pass
+    else:
+        assert res == host.Result("", "", res.returncode, cancelled=True)
+        if isinstance(rsh, host.RemoteHost):
+            assert res.returncode in [0, -1]
+        else:
+            assert res.returncode in [0, -15]
+
+    for i in range(3):
+
+        def _run(th: common.FutureThread[host.Result]) -> host.Result:
+            rnd_sleep(0.05)
+            return rsh.run(
+                "sleep 5",
+                cancellable=th.cancellable,
+            )
+
+        thread = common.FutureThread(_run, start=True)
+        rnd_sleep(0.2)
+        res = thread.join_and_result(cancel=True)
+        if res != host.Result.CANCELLED:
+            if isinstance(rsh, host.RemoteHost):
+                assert res == host.Result("", "", -1, cancelled=True)
+            else:
+                assert res == host.Result("", "", -15, cancelled=True)
+
+
+def _test_cat(rsh: host.Host) -> None:
+    # cat is curious, since it will quit immediately on /dev/null That is
+    # different from many other applications, which would try to read /dev/null
+    # and wait forever.
+    #
+    # To get that behavior consistent, we always spawn our process with
+    # /dev/null redirected to it.
+    res = rsh.run("cat")
+    assert res == host.Result("", "", 0)
+
+    res = rsh.run("cat", cancellable=common.Cancellable())
+    assert res == host.Result("", "", 0)
+
+    skip_without_sudo(rsh)
+
+    res = rsh.run("cat", sudo=True)
+    assert res == host.Result("", "", 0)
+
+    res = rsh.run("cat", cancellable=common.Cancellable())
+    assert res == host.Result("", "", 0)
+
+
+def test_cat_local() -> None:
+    _test_cat(host.local)
+
+
+def test_cat_remote() -> None:
+    user, rsh = skip_without_ssh_nopass()
+    _test_cat(rsh)
+
+
+def test_cancellable_local() -> None:
+    _test_cancellable(host.local)
+
+
+def test_cancellable_remote_1() -> None:
+    user, rsh = skip_without_ssh_nopass()
+    _test_cancellable(rsh)
+
+
+def test_cancellable_remote_2() -> None:
+    user, rsh = skip_without_ssh_nopass()
+
+    cancellable = common.Cancellable()
+
+    def line_callback(is_stdout: bool, line: bytes) -> None:
+        assert is_stdout is True
+        assert line == b"foo\n"
+        cancellable.cancel()
+
+    thread = common.FutureThread(
+        lambda th: rsh.run(
+            "echo foo; sleep 13",
+            cancellable=cancellable,
+            line_callback=line_callback,
+        ),
+        start=True,
+    )
+    res = thread.join_and_result()
+    assert res == host.Result("foo\n", "", -1, cancelled=True)
+
+
+def test_cancellable_remote_3() -> None:
+    user, rsh = skip_without_ssh_nopass()
+    skip_without_sudo(rsh)
+
+    res = rsh.run(
+        "sleep 14",
+        env={"FOO": "foo"},
+        cwd="/tmp",
+        sudo=True,
+        cancellable=rnd_cancel_in_background(0.1),
+    )
+    if res != host.Result.CANCELLED:
+        assert res == host.Result("", "", -1, cancelled=True)
+
+
+def _test_cancellable_1(rsh: host.Host) -> None:
+    cancellable = common.Cancellable()
+
+    def _line_callback(is_stdout: bool, line: bytes) -> None:
+        if line == b"done\n":
+            cancellable.cancel()
+
+    thread = common.FutureThread(
+        lambda th: rsh.run(
+            'pwd; whoami; echo ">$FOO<"; /bin/echo done; sleep 14',
+            env={"FOO": "foo"},
+            cwd="/tmp",
+            sudo=True,
+            cancellable=cancellable,
+            line_callback=_line_callback,
+        ),
+        start=True,
+    )
+    res = thread.join_and_result()
+    assert res == host.Result(
+        "/tmp\nroot\n>foo<\ndone\n",
+        "",
+        -15 if isinstance(rsh, host.LocalHost) else -1,
+        cancelled=True,
+    )
+
+
+def test_cancellable_1_local() -> None:
+    skip_without_sudo(host.local)
+    _test_cancellable_1(host.local)
+
+
+def test_cancellable_1_remote() -> None:
+    user, rsh = skip_without_ssh_nopass()
+    skip_without_sudo(rsh)
+    _test_cancellable_1(rsh)
