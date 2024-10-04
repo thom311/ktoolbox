@@ -314,7 +314,7 @@ def test_cwd() -> None:
 
     res = host.local.run("pwd", cwd="/usr/bin/does/not/exist")
     assert res.out == ""
-    assert res.returncode == 1
+    assert res.returncode == host.RETURNCODE_INTERNAL
     assert "/usr/bin/does/not/exist" in res.err
 
     res = host.local.run("pwd", cwd="/root")
@@ -323,7 +323,7 @@ def test_cwd() -> None:
         pass
     else:
         assert res.out == ""
-        assert res.returncode == 1
+        assert res.returncode == host.RETURNCODE_INTERNAL
         assert "/root" in res.err
 
 
@@ -375,7 +375,7 @@ def test_remotehost_userdoesnotexist() -> None:
     assert res == host.Result(
         out="",
         err="Host.run(): failed to login to remote host localhost",
-        returncode=1,
+        returncode=host.RETURNCODE_INTERNAL,
     )
 
 
