@@ -25,7 +25,8 @@ from . import common
 
 
 INTERNAL_ERROR_PREFIX = "Host.run(): "
-INTERNAL_ERROR_RETURNCODE = 1
+
+RETURNCODE_INTERNAL = 1024
 
 logger = logging.getLogger(__name__)
 
@@ -195,11 +196,14 @@ class BinResult(BaseResult[bytes]):
         )
 
     @staticmethod
-    def internal_failure(msg: str) -> "BinResult":
+    def new_internal(
+        msg: str,
+        returncode: int = RETURNCODE_INTERNAL,
+    ) -> "BinResult":
         return BinResult(
             b"",
             (INTERNAL_ERROR_PREFIX + msg).encode(errors="surrogateescape"),
-            INTERNAL_ERROR_RETURNCODE,
+            returncode,
         )
 
 
@@ -588,7 +592,7 @@ class LocalHost(Host):
             #
             # Usually we avoid creating an artificial BinResult. In this case
             # there is no choice.
-            return BinResult.internal_failure(str(e))
+            return BinResult.new_internal(str(e))
 
         buffers = (bytearray(), bytearray())
 
@@ -799,7 +803,7 @@ class RemoteHost(Host):
                 force_new_login=not first_try,
             )
             if client is None:
-                return BinResult.internal_failure(
+                return BinResult.new_internal(
                     f"failed to login to remote host {self.host}"
                 )
 
@@ -809,7 +813,7 @@ class RemoteHost(Host):
                 if new_login:
                     # We just did a new login and got a failure. Propagate the
                     # error.
-                    return BinResult.internal_failure(str(e))
+                    return BinResult.new_internal(str(e))
 
                 # We had a cached login from earlier. Maybe this was broken
                 # and the cause for error now. Retry and force new login.
