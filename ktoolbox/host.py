@@ -27,6 +27,9 @@ from . import common
 INTERNAL_ERROR_PREFIX = "Host.run(): "
 
 RETURNCODE_INTERNAL = 1024
+RETURNCODE_CANCELLED = 1025
+
+TERMINATE_KILL_WAIT = 1.0
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,76 @@ def _cmd_to_argv(cmd: Union[str, Iterable[str]]) -> tuple[str, ...]:
     return tuple(cmd)
 
 
+def _cmd_with_sudo(
+    *,
+    cmd: Union[str, Iterable[str]],
+    env: Optional[Mapping[str, Optional[str]]],
+    cwd: Optional[str],
+) -> tuple[str, ...]:
+    cmd2 = ["sudo", "-n"]
+
+    if env:
+        for k, v in env.items():
+            assert k == shlex.quote(k)
+            assert "=" not in k
+            if v is not None:
+                cmd2.append(f"{k}={v}")
+
+    if cwd is not None:
+        # sudo's "--chdir" option often does not work based on the sudo
+        # configuration. Instead, change the directory inside the shell
+        # script.
+        cmd = _cmd_to_shell(cmd, cwd=cwd)
+
+    cmd2.extend(_cmd_to_argv(cmd))
+
+    return tuple(cmd2)
+
+
+def _pr_kill(
+    pr: subprocess.Popen[bytes],
+    *,
+    sudo: bool,
+    handle_log: Callable[[int, str], None],
+    with_sigkill: bool = False,
+) -> None:
+    try:
+        if sudo:
+            # If the process runs with `sudo`, we must also use `sudo` to send the
+            # signal.  Also, if the signal originates from the same process
+            # group, it is ignored (hence the "setsid").
+            #
+            # Also, note that `sudo` cannot intercept SIGKILL and cannot
+            # forward it to the running process. So killing with SIGKILL is
+            # unlikely to work reasonably.  In any case, SIGKILL is only a last
+            # resort. The user is supposed to only cancel processes if they let
+            # themselves be terminated by SIGTERM.
+            subprocess.run(
+                [
+                    "setsid",
+                    "sudo",
+                    "-n",
+                    "kill",
+                    "-SIGKILL" if with_sigkill else "-SIGTERM",
+                    str(pr.pid),
+                ],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            if with_sigkill:
+                pr.kill()
+            else:
+                pr.terminate()
+    except Exception as e:
+        handle_log(
+            logging.ERROR,
+            f"cancelled: sending {'SIGKILL' if with_sigkill else 'SIGTERM'} to process {pr.pid} failed: {e}",
+        )
+
+
 def _unique_log_id() -> int:
     # For each run() call, we log a message when starting the command and when
     # completing it. Add a unique number to those logging statements, so that
@@ -104,10 +177,14 @@ class BaseResult(_BaseResult[AnyStr]):
         # kw_only=True <- use once we upgrade to 3.10 and drop KW_ONLY_DATACLASS.
     )
 
+    cancelled: bool = False
+
     @property
     def success(self) -> bool:
         if self.forced_success is not None:
             return self.forced_success
+        if self.cancelled:
+            return False
         return self.returncode == 0
 
     def __bool__(self) -> bool:
@@ -172,7 +249,10 @@ class Result(BaseResult[str]):
             self.err,
             self.returncode,
             forced_success=forced_success,
+            cancelled=self.cancelled,
         )
+
+    CANCELLED: typing.ClassVar["Result"]
 
 
 @dataclass(frozen=True)
@@ -183,6 +263,7 @@ class BinResult(BaseResult[bytes]):
             self.err.decode(errors=errors),
             self.returncode,
             forced_success=self.forced_success,
+            cancelled=self.cancelled,
         )
 
     def dup_with_forced_success(self, forced_success: bool) -> "BinResult":
@@ -193,18 +274,32 @@ class BinResult(BaseResult[bytes]):
             self.err,
             self.returncode,
             forced_success=forced_success,
+            cancelled=self.cancelled,
         )
 
     @staticmethod
     def new_internal(
         msg: str,
         returncode: int = RETURNCODE_INTERNAL,
+        cancelled: bool = False,
     ) -> "BinResult":
         return BinResult(
             b"",
             (INTERNAL_ERROR_PREFIX + msg).encode(errors="surrogateescape"),
             returncode,
+            cancelled=cancelled,
         )
+
+    CANCELLED: typing.ClassVar["BinResult"]
+
+
+BinResult.CANCELLED = BinResult.new_internal(
+    "operation cancelled",
+    RETURNCODE_CANCELLED,
+    cancelled=True,
+)
+
+Result.CANCELLED = BinResult.CANCELLED.decode()
 
 
 class Host(ABC):
@@ -219,43 +314,21 @@ class Host(ABC):
     def pretty_str(self) -> str:
         pass
 
+    @abstractmethod
     def _prepare_run(
         self,
         *,
-        sudo: bool,
-        cwd: Optional[str],
         cmd: Union[str, Iterable[str]],
         env: Optional[Mapping[str, Optional[str]]],
+        cwd: Optional[str],
+        sudo: bool,
+        has_cancellable: bool,
     ) -> tuple[
         Union[str, tuple[str, ...]],
         Optional[dict[str, Optional[str]]],
         Optional[str],
     ]:
-        if not sudo:
-            return (
-                _normalize_cmd(cmd),
-                _normalize_env(env),
-                cwd,
-            )
-
-        cmd2 = ["sudo", "-n"]
-
-        if env:
-            for k, v in env.items():
-                assert k == shlex.quote(k)
-                assert "=" not in k
-                if v is not None:
-                    cmd2.append(f"{k}={v}")
-
-        if cwd is not None:
-            # sudo's "--chdir" option often does not work based on the sudo
-            # configuration. Instead, change the directory inside the shell
-            # script.
-            cmd = _cmd_to_shell(cmd, cwd=cwd)
-
-        cmd2.extend(_cmd_to_argv(cmd))
-
-        return tuple(cmd2), None, None
+        pass
 
     @typing.overload
     def run(
@@ -274,6 +347,7 @@ class Host(ABC):
         check_success: Optional[Callable[[Result], bool]] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Result:
         pass
@@ -295,6 +369,7 @@ class Host(ABC):
         check_success: Optional[Callable[[BinResult], bool]] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> BinResult:
         pass
@@ -318,6 +393,7 @@ class Host(ABC):
         ] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Union[Result, BinResult]:
         pass
@@ -340,6 +416,7 @@ class Host(ABC):
         ] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Union[Result, BinResult]:
         log_id = _unique_log_id()
@@ -348,10 +425,11 @@ class Host(ABC):
             sudo = self._sudo
 
         real_cmd, real_env, real_cwd = self._prepare_run(
-            sudo=sudo,
-            cwd=cwd,
             cmd=cmd,
             env=env,
+            cwd=cwd,
+            sudo=sudo,
+            has_cancellable=cancellable is not None,
         )
 
         if log_level >= 0:
@@ -368,36 +446,41 @@ class Host(ABC):
             else:
                 log_lineoutput = logging.DEBUG
 
-        _handle_line = line_callback
-        if log_lineoutput >= 0:
-            line_num = [0, 0]
+        if common.Cancellable.is_cancelled(cancellable):
+            bin_result = BinResult.CANCELLED
+        else:
+            _handle_line = line_callback
+            if log_lineoutput >= 0:
+                line_num = [0, 0]
 
-            def _handle_line_log(is_stdout: bool, line: bytes) -> None:
-                outtype = "stdout" if is_stdout else "stderr"
-                logger.log(
-                    log_lineoutput,
-                    f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {outtype}[{line_num[is_stdout]}] {repr(line)}",
-                )
-                line_num[is_stdout] += 1
-                if line_callback is not None:
-                    line_callback(is_stdout, line)
+                def _handle_line_log(is_stdout: bool, line: bytes) -> None:
+                    outtype = "stdout" if is_stdout else "stderr"
+                    logger.log(
+                        log_lineoutput,
+                        f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {outtype}[{line_num[is_stdout]}] {repr(line)}",
+                    )
+                    line_num[is_stdout] += 1
+                    if line_callback is not None:
+                        line_callback(is_stdout, line)
 
-            _handle_line = _handle_line_log
+                _handle_line = _handle_line_log
 
-        def _handle_log(level: int, msg: str) -> None:
-            if level >= log_level:
-                logger.log(
-                    level,
-                    f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {msg}",
-                )
+            def _handle_log(level: int, msg: str) -> None:
+                if level >= log_level:
+                    logger.log(
+                        level,
+                        f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {msg}",
+                    )
 
-        bin_result = self._run(
-            cmd=real_cmd,
-            env=real_env,
-            cwd=real_cwd,
-            handle_line=_handle_line,
-            handle_log=_handle_log,
-        )
+            bin_result = self._run(
+                cmd=real_cmd,
+                env=real_env,
+                cwd=real_cwd,
+                sudo=sudo,
+                handle_line=_handle_line,
+                handle_log=_handle_log,
+                cancellable=cancellable,
+            )
 
         # The remainder is only concerned with printing a nice logging message and
         # (potentially) decode the binary output.
@@ -501,6 +584,9 @@ class Host(ABC):
             if result_log_level < logging.ERROR:
                 result_log_level = logging.ERROR
 
+        if bin_result.cancelled:
+            status_msg += " [CANCELLED]"
+
         if str_result is not None:
             str_result = str_result.dup_with_forced_success(result_success)
         bin_result = bin_result.dup_with_forced_success(result_success)
@@ -556,8 +642,10 @@ class Host(ABC):
         cmd: Union[str, tuple[str, ...]],
         env: Optional[dict[str, Optional[str]]],
         cwd: Optional[str],
+        sudo: bool,
         handle_line: Optional[Callable[[bool, bytes], None]],
         handle_log: Callable[[int, str], None],
+        cancellable: Optional[common.Cancellable],
     ) -> BinResult:
         pass
 
@@ -569,14 +657,41 @@ class LocalHost(Host):
     def pretty_str(self) -> str:
         return "localhost"
 
+    def _prepare_run(
+        self,
+        *,
+        cmd: Union[str, Iterable[str]],
+        env: Optional[Mapping[str, Optional[str]]],
+        cwd: Optional[str],
+        sudo: bool,
+        has_cancellable: bool,
+    ) -> tuple[
+        Union[str, tuple[str, ...]],
+        Optional[dict[str, Optional[str]]],
+        Optional[str],
+    ]:
+        if not sudo:
+            return (
+                _normalize_cmd(cmd),
+                _normalize_env(env),
+                cwd,
+            )
+        return (
+            _cmd_with_sudo(cmd=cmd, cwd=cwd, env=env),
+            None,
+            None,
+        )
+
     def _run(
         self,
         *,
         cmd: Union[str, tuple[str, ...]],
         env: Optional[dict[str, Optional[str]]],
         cwd: Optional[str],
+        sudo: bool,
         handle_line: Optional[Callable[[bool, bytes], None]],
         handle_log: Callable[[int, str], None],
+        cancellable: Optional[common.Cancellable],
     ) -> BinResult:
         full_env: Optional[dict[str, str]] = None
         if env is not None:
@@ -588,9 +703,13 @@ class LocalHost(Host):
                     full_env[k] = v
 
         try:
+            # We set stdin to DEVNULL. That is for consistency with
+            # RemoteHost, which also does `sh -c {shlex.quote(cmd)} < /dev/null`
+            # if the command has a cancellable.
             pr = subprocess.Popen(
                 cmd,
                 shell=isinstance(cmd, str),
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=False,
@@ -633,17 +752,74 @@ class LocalHost(Host):
                 if not read_all:
                     return
 
+        fd_cancellable = cancellable.get_poll_fd() if cancellable else None
+        terminate_state = -1
+        terminate_kill_at_timestamp = 0.0
+
+        returncode = RETURNCODE_CANCELLED
+
         while True:
-            to_read, _, _ = select.select([pr.stdout, pr.stderr], [], [])
+            fds: list[Optional[Union[typing.IO[bytes], int]]] = [pr.stdout, pr.stderr]
+            if fd_cancellable is not None:
+                fds.append(fd_cancellable)
+
+            select_timeout: Optional[float] = None
+            if terminate_state >= 1:
+                select_timeout = max(
+                    0.0, (terminate_kill_at_timestamp - time.monotonic())
+                )
+
+            to_read, _, _ = select.select(fds, [], [], select_timeout)
+
             for stream in to_read:
+                if fd_cancellable is not None and stream == fd_cancellable:
+                    fd_cancellable = None
+                    terminate_state = 0
+                    continue
                 _readlines(stream, read_all=False)
+
+            if terminate_state == 0:
+                terminate_state = 1
+                terminate_kill_at_timestamp = time.monotonic() + TERMINATE_KILL_WAIT
+                handle_log(
+                    logging.DEBUG,
+                    f"cancelled: terminate {'sudo ' if sudo else ''}process {pr.pid}",
+                )
+                _pr_kill(pr, sudo=sudo, handle_log=handle_log)
+            elif terminate_state == 1:
+                if time.monotonic() >= terminate_kill_at_timestamp:
+                    # The process MUST exit on SIGTERM in time. It is hanging, that is
+                    # a bug. The user must not try to cancel processes that refuse to
+                    # quit on SIGTERM. The handling here is just trying to recover from
+                    # the bad thing that already happend.
+                    terminate_state = 2
+                    terminate_kill_at_timestamp += TERMINATE_KILL_WAIT / 2.0
+                    handle_log(
+                        logging.ERROR,
+                        f"{'sudo ' if sudo else ''}process {pr.pid} is not quitting in time",
+                    )
+                    _pr_kill(pr, sudo=sudo, handle_log=handle_log, with_sigkill=True)
+            elif terminate_state == 2:
+                if time.monotonic() >= terminate_kill_at_timestamp:
+                    terminate_state = 3
+                    handle_log(
+                        logging.ERROR,
+                        f"{'sudo ' if sudo else ''}process {pr.pid} cannot be killed and hangs",
+                    )
+                    break
+
             if pr.poll() is not None:
+                returncode = pr.returncode
                 break
         _readlines(pr.stdout, read_all=True)
         _readlines(pr.stderr, read_all=True)
-        pr.wait()
 
-        return BinResult(bytes(buffers[True]), bytes(buffers[False]), pr.returncode)
+        return BinResult(
+            bytes(buffers[True]),
+            bytes(buffers[False]),
+            returncode,
+            cancelled=terminate_state >= 0,
+        )
 
     def file_exists(self, path: Union[str, os.PathLike[Any]]) -> bool:
         return os.path.exists(path)
@@ -703,22 +879,16 @@ class RemoteHost(Host):
     def _prepare_run(
         self,
         *,
-        sudo: bool,
-        cwd: Optional[str],
         cmd: Union[str, Iterable[str]],
         env: Optional[Mapping[str, Optional[str]]],
+        cwd: Optional[str],
+        sudo: bool,
+        has_cancellable: bool,
     ) -> tuple[
         Union[str, tuple[str, ...]],
         Optional[dict[str, Optional[str]]],
         Optional[str],
     ]:
-        cmd, env, cwd = super()._prepare_run(
-            sudo=sudo,
-            cwd=cwd,
-            cmd=cmd,
-            env=env,
-        )
-
         cmd = _cmd_to_shell(cmd, cwd=cwd)
 
         if env:
@@ -731,6 +901,24 @@ class RemoteHost(Host):
                 else:
                     cmd2 += f"export {k}={shlex.quote(v)} ; "
             cmd = cmd2 + cmd
+
+        if has_cancellable:
+            # We want to abort the process, but paramiko/SSH doesn't directly
+            # allow to kill the process.
+            #
+            # Instead, start a wrapping shell script that reads from STDIN.
+            # When STDIN closes, the script kills the command.
+            cmd = (
+                "bash",
+                "-c",
+                f"/bin/sh -c {shlex.quote(cmd)} < /dev/null & pid=$!; cat | {{ cat; kill $pid; }} 2> /dev/null & wait $pid",
+            )
+        else:
+            # For consistency with other operations, stdin of the invoked command is /dev/null.
+            cmd = f"/bin/sh -c {shlex.quote(cmd)} < /dev/null"
+
+        if sudo:
+            cmd = _cmd_with_sudo(cmd=cmd, cwd=None, env=None)
 
         return cmd, None, None
 
@@ -749,11 +937,17 @@ class RemoteHost(Host):
             login = tlocal.login
         return tlocal, client, login
 
+    def _clear_client(self) -> None:
+        tlocal = self._tlocal
+        tlocal.client = None
+        tlocal.login = None
+
     def _ensure_login(
         self,
         *,
-        force_new_login: bool = False,
-        start_timestamp: float = -1.0,
+        force_new_login: bool,
+        start_timestamp: float,
+        cancellable: Optional[common.Cancellable],
         handle_log: Callable[[int, str], None],
     ) -> tuple[Optional["paramiko.SSHClient"], bool]:
         tlocal, client, login = self._get_client()
@@ -778,26 +972,33 @@ class RemoteHost(Host):
                 except Exception as e:
                     error = e
                 else:
+                    common.unwrap(client.get_transport()).set_keepalive(1)
                     tlocal.login = login
-                    handle_log(
-                        logging.DEBUG,
-                        f"successfully logged in to {login}",
-                    )
+                    if handle_log is not None:
+                        handle_log(
+                            logging.DEBUG,
+                            f"remote[{self.pretty_str()}]: successfully logged in to {login}",
+                        )
                     return client, True
 
                 if try_count == 0:
-                    handle_log(
-                        logging.DEBUG,
-                        f"failed to login to {login}: {error}",
-                    )
+                    if handle_log is not None:
+                        handle_log(
+                            logging.DEBUG,
+                            f"remote[{self.pretty_str()}]: failed to login to {login}: {error}",
+                        )
+
+                if common.Cancellable.is_cancelled(cancellable):
+                    return None, False
 
             try_count += 1
 
             if time.monotonic() >= end_timestamp:
-                handle_log(
-                    logging.DEBUG,
-                    f"failed to login with credentials {self.logins} ({try_count} tries)",
-                )
+                if handle_log is not None:
+                    handle_log(
+                        logging.DEBUG,
+                        f"remote[{self.pretty_str()}]: failed to login with credentials {self.logins} ({try_count} tries)",
+                    )
                 return None, False
 
     def _run(
@@ -806,13 +1007,15 @@ class RemoteHost(Host):
         cmd: Union[str, tuple[str, ...]],
         env: Optional[dict[str, Optional[str]]],
         cwd: Optional[str],
+        sudo: bool,
         handle_line: Optional[Callable[[bool, bytes], None]],
         handle_log: Callable[[int, str], None],
+        cancellable: Optional[common.Cancellable],
     ) -> BinResult:
 
-        assert isinstance(cmd, str)
         assert env is None
         assert cwd is None
+        cmd = _cmd_to_shell(cmd)
 
         bin_cmd: Any = cmd.encode("utf-8", errors="surrogateescape")
 
@@ -823,14 +1026,17 @@ class RemoteHost(Host):
                 start_timestamp=start_timestamp,
                 force_new_login=not first_try,
                 handle_log=handle_log,
+                cancellable=cancellable,
             )
             if client is None:
+                if common.Cancellable.is_cancelled(cancellable):
+                    return BinResult.CANCELLED
                 return BinResult.new_internal(
                     f"failed to login to remote host {self.host}"
                 )
 
             try:
-                _, stdout, stderr = client.exec_command(bin_cmd)
+                stdin, stdout, stderr = client.exec_command(bin_cmd)
             except Exception as e:
                 if new_login:
                     # We just did a new login and got a failure. Propagate the
@@ -846,12 +1052,19 @@ class RemoteHost(Host):
 
         buffers = (bytearray(), bytearray())
         sources = (stderr, stdout)
-        fds = tuple(s.channel.fileno() for s in sources)
 
         for source in sources:
             source.channel.setblocking(0)
 
-        def _readlines(*, is_stdout: bool) -> None:
+        fds = [s.channel.fileno() for s in sources]
+        if cancellable is not None:
+            fds.append(cancellable.get_poll_fd())
+
+        def _readlines(*, is_stdout: Optional[bool] = None) -> None:
+            if is_stdout is None:
+                _readlines(is_stdout=False)
+                _readlines(is_stdout=True)
+                return
             channel = sources[is_stdout].channel
             buffer = buffers[is_stdout]
             start_idx = len(buffer)
@@ -883,15 +1096,54 @@ class RemoteHost(Host):
                         break
                     handle_line(is_stdout, line)
 
-        while not stdout.channel.exit_status_ready():
+        terminate_state = -1
+        terminate_kill_at_timestamp = 0.0
+
+        while True:
+            if stdout.channel.exit_status_ready():
+                returncode = stdout.channel.recv_exit_status()
+                break
+
             to_read, _, _ = select.select(fds, [], [])
             for fd in to_read:
+                if len(fds) == 3 and fd == fds[2]:
+                    del fds[2]
+                    terminate_state = 0
+                    continue
                 _readlines(is_stdout=(fd == fds[True]))
-        returncode = stdout.channel.recv_exit_status()
-        _readlines(is_stdout=True)
-        _readlines(is_stdout=False)
 
-        return BinResult(bytes(buffers[True]), bytes(buffers[False]), returncode)
+            if terminate_state == 0:
+                # We signal termination by closing stdin of the remote process.
+                stdin.channel.close()
+                terminate_kill_at_timestamp = time.monotonic() + (
+                    TERMINATE_KILL_WAIT * 1.5
+                )
+                terminate_state = 1
+            elif terminate_state == 1:
+                if time.monotonic() >= terminate_kill_at_timestamp:
+                    terminate_state = 2
+                    handle_log(
+                        logging.ERROR, "remote process did not terminate and hangs"
+                    )
+                    returncode = RETURNCODE_CANCELLED
+                    break
+
+        _readlines()
+
+        if terminate_state < 0:
+            stdin.channel.close()
+        stdout.channel.close()
+        stderr.channel.close()
+
+        if terminate_state == 2:
+            self._clear_client()
+
+        return BinResult(
+            bytes(buffers[True]),
+            bytes(buffers[False]),
+            returncode,
+            cancelled=terminate_state >= 0,
+        )
 
 
 local = LocalHost()
