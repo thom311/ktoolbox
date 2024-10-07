@@ -15,9 +15,10 @@ from typing import Union
 from ktoolbox import host
 
 
-def _rnd_log_lineoutput() -> dict[str, Any]:
-    r = random.randint(0, 4)
+def rnd_run_extraargs() -> dict[str, Any]:
+    args: dict[str, Any] = {}
 
+    r = random.randint(0, 4)
     val: Optional[Union[int, bool]] = None
     if r <= 1:
         val = r == 0
@@ -27,12 +28,10 @@ def _rnd_log_lineoutput() -> dict[str, Any]:
         val = logging.DEBUG
     else:
         val = logging.ERROR
+    if val is not None:
+        args["log_lineoutput"] = val
 
-    if val is None:
-        return {}
-    return {
-        "log_lineoutput": val,
-    }
+    return args
 
 
 @functools.cache
@@ -131,13 +130,13 @@ def test_host_result_bin() -> None:
 
 def test_host_result_surrogateescape() -> None:
     res = host.local.run(
-        "echo -n hi", decode_errors="surrogateescape", **_rnd_log_lineoutput()
+        "echo -n hi", decode_errors="surrogateescape", **rnd_run_extraargs()
     )
     assert res == host.Result("hi", "", 0)
 
     cmd = ["bash", "-c", "printf $'xx<\\325>'"]
 
-    res_bin = host.local.run(cmd, text=False, **_rnd_log_lineoutput())
+    res_bin = host.local.run(cmd, text=False, **rnd_run_extraargs())
     assert res_bin == host.BinResult(b"xx<\325>", b"", 0)
 
     res = host.local.run(cmd, decode_errors="surrogateescape")
@@ -157,7 +156,7 @@ def test_host_result_surrogateescape() -> None:
     assert res_bin == host.BinResult(b"xx<\325>", b"", 0)
 
     t = False
-    res_any = host.local.run(cmd2, text=t, **_rnd_log_lineoutput())
+    res_any = host.local.run(cmd2, text=t, **rnd_run_extraargs())
     assert isinstance(res_any, host.BinResult)
     assert res_any == host.BinResult(b"xx<\325>", b"", 0)
 
@@ -175,7 +174,7 @@ def test_host_result_str() -> None:
     res = host.local.run("echo -n out; echo -n err >&2", text=True)
     assert res == host.Result("out", "err", 0)
 
-    res = host.local.run("echo -n out; echo -n err >&2", **_rnd_log_lineoutput())
+    res = host.local.run("echo -n out; echo -n err >&2", **rnd_run_extraargs())
     assert res == host.Result("out", "err", 0)
 
 
@@ -227,7 +226,7 @@ def test_host_various_results() -> None:
         res = host.local.run('printf "foo:\\705x"', decode_errors="strict")
 
     res = host.local.run(
-        'printf "foo:\\705x"', decode_errors="backslashreplace", **_rnd_log_lineoutput()
+        'printf "foo:\\705x"', decode_errors="backslashreplace", **rnd_run_extraargs()
     )
     assert res == host.Result("foo:\\xc5x", "", 0)
 
@@ -249,7 +248,7 @@ def test_host_check_success() -> None:
         "echo -n foo",
         text=False,
         check_success=lambda r: r.out != b"foo",
-        **_rnd_log_lineoutput(),
+        **rnd_run_extraargs(),
     )
     assert binres == host.BinResult(b"foo", b"", 0, forced_success=False)
     assert not binres.success
@@ -382,14 +381,14 @@ def test_remotehost_userdoesnotexist() -> None:
 def test_remotehost_1() -> None:
     user, rsh = skip_without_ssh_nopass()
 
-    res = rsh.run("whoami", **_rnd_log_lineoutput())
+    res = rsh.run("whoami", **rnd_run_extraargs())
     assert res == host.Result(f"{user}\n", "", 0)
 
     res = rsh.run(
         'whoami; pwd; echo ">>$FOO<"',
         cwd="/usr",
         env={"FOO": "hi"},
-        **_rnd_log_lineoutput(),
+        **rnd_run_extraargs(),
     )
     assert res == host.Result(f"{user}\n/usr\n>>hi<\n", "", 0)
 
@@ -397,7 +396,7 @@ def test_remotehost_1() -> None:
 def test_remotehost_sudo() -> None:
     user, rsh = skip_without_ssh_nopass()
 
-    res = rsh.run("whoami", sudo=True, **_rnd_log_lineoutput())
+    res = rsh.run("whoami", sudo=True, **rnd_run_extraargs())
     if res.success:
         assert res == host.Result("root\n", "", 0)
     else:
