@@ -384,11 +384,19 @@ class Host(ABC):
 
             _handle_line = _handle_line_log
 
+        def _handle_log(level: int, msg: str) -> None:
+            if level >= log_level:
+                logger.log(
+                    level,
+                    f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {msg}",
+                )
+
         bin_result = self._run(
             cmd=real_cmd,
             env=real_env,
             cwd=real_cwd,
             handle_line=_handle_line,
+            handle_log=_handle_log,
         )
 
         # The remainder is only concerned with printing a nice logging message and
@@ -549,6 +557,7 @@ class Host(ABC):
         env: Optional[dict[str, Optional[str]]],
         cwd: Optional[str],
         handle_line: Optional[Callable[[bool, bytes], None]],
+        handle_log: Callable[[int, str], None],
     ) -> BinResult:
         pass
 
@@ -567,6 +576,7 @@ class LocalHost(Host):
         env: Optional[dict[str, Optional[str]]],
         cwd: Optional[str],
         handle_line: Optional[Callable[[bool, bytes], None]],
+        handle_log: Callable[[int, str], None],
     ) -> BinResult:
         full_env: Optional[dict[str, str]] = None
         if env is not None:
@@ -744,6 +754,7 @@ class RemoteHost(Host):
         *,
         force_new_login: bool = False,
         start_timestamp: float = -1.0,
+        handle_log: Callable[[int, str], None],
     ) -> tuple[Optional["paramiko.SSHClient"], bool]:
         tlocal, client, login = self._get_client()
 
@@ -768,21 +779,24 @@ class RemoteHost(Host):
                     error = e
                 else:
                     tlocal.login = login
-                    logger.debug(
-                        f"remote[{self.pretty_str()}]: successfully logged in to {login}"
+                    handle_log(
+                        logging.DEBUG,
+                        f"successfully logged in to {login}",
                     )
                     return client, True
 
                 if try_count == 0:
-                    logger.debug(
-                        f"remote[{self.pretty_str()}]: failed to login to {login}: {error}"
+                    handle_log(
+                        logging.DEBUG,
+                        f"failed to login to {login}: {error}",
                     )
 
             try_count += 1
 
             if time.monotonic() >= end_timestamp:
-                logger.debug(
-                    f"remote[{self.pretty_str()}]: failed to login with credentials {self.logins} ({try_count} tries)"
+                handle_log(
+                    logging.DEBUG,
+                    f"failed to login with credentials {self.logins} ({try_count} tries)",
                 )
                 return None, False
 
@@ -793,6 +807,7 @@ class RemoteHost(Host):
         env: Optional[dict[str, Optional[str]]],
         cwd: Optional[str],
         handle_line: Optional[Callable[[bool, bytes], None]],
+        handle_log: Callable[[int, str], None],
     ) -> BinResult:
 
         assert isinstance(cmd, str)
@@ -807,6 +822,7 @@ class RemoteHost(Host):
             client, new_login = self._ensure_login(
                 start_timestamp=start_timestamp,
                 force_new_login=not first_try,
+                handle_log=handle_log,
             )
             if client is None:
                 return BinResult.new_internal(
