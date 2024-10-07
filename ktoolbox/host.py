@@ -274,6 +274,7 @@ class Host(ABC):
         check_success: Optional[Callable[[Result], bool]] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Result:
         pass
 
@@ -294,6 +295,7 @@ class Host(ABC):
         check_success: Optional[Callable[[BinResult], bool]] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> BinResult:
         pass
 
@@ -316,6 +318,7 @@ class Host(ABC):
         ] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Union[Result, BinResult]:
         pass
 
@@ -337,6 +340,7 @@ class Host(ABC):
         ] = None,
         die_on_error: bool = False,
         decode_errors: Optional[str] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Union[Result, BinResult]:
         log_id = _unique_log_id()
 
@@ -364,7 +368,7 @@ class Host(ABC):
             else:
                 log_lineoutput = logging.DEBUG
 
-        _handle_line: Optional[Callable[[bool, bytes], None]] = None
+        _handle_line = line_callback
         if log_lineoutput >= 0:
             line_num = [0, 0]
 
@@ -375,6 +379,8 @@ class Host(ABC):
                     f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {outtype}[{line_num[is_stdout]}] {repr(line)}",
                 )
                 line_num[is_stdout] += 1
+                if line_callback is not None:
+                    line_callback(is_stdout, line)
 
             _handle_line = _handle_line_log
 
