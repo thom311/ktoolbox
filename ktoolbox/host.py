@@ -363,7 +363,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -385,7 +385,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -407,7 +407,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -430,7 +430,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -443,6 +443,12 @@ class Host(ABC):
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
     ) -> Union[Result, BinResult]:
         log_id = _unique_log_id()
+
+        if log_level is None:
+            if log_level_result is None:
+                log_level = logging.DEBUG
+            else:
+                log_level = -1
 
         sudo = self.get_effective_sudo(sudo)
 
@@ -637,9 +643,14 @@ class Host(ABC):
                 assert str_result is not None
                 debug_str = str_result.debug_str(with_output=with_output)
 
+            if log_level >= 0:
+                result_kind = "└──>"
+            else:
+                result_kind = ">"
+
             logger.log(
                 result_log_level,
-                f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: └──> {_cmd_to_logstr(real_cmd)}:{status_msg} {debug_str}",
+                f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {result_kind} {_cmd_to_logstr(real_cmd)}:{status_msg} {debug_str}",
             )
 
         if decode_exception:
@@ -692,7 +703,6 @@ class Host(ABC):
             ["sudo", "-n", "whoami"],
             text=False,
             sudo=False,
-            log_level=-1,
             log_level_result=log_level,
         )
         has = res.match(out=b"root\n", err=b"", returncode=0)
@@ -724,7 +734,6 @@ class Host(ABC):
             cwd=cwd,
             sudo=sudo,
             log_prefix=log_prefix,
-            log_level=-1,
             log_level_result=log_level,
         )
         return res.success
@@ -744,7 +753,6 @@ class Host(ABC):
             cwd=cwd,
             sudo=sudo,
             log_prefix=log_prefix,
-            log_level=-1,
             log_level_result=log_level,
         )
         return res.success
