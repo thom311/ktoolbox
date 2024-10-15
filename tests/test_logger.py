@@ -1,4 +1,5 @@
 import logging
+import pytest
 
 from ktoolbox import common
 
@@ -23,5 +24,10 @@ def test_logger_1() -> None:
     assert logger.handlers is logger.wrapped_logger.handlers
     assert len(logger.handlers) == 1
     assert isinstance(logger.handlers[0], common._LogHandler)
+
+    with pytest.raises(SystemExit) as pytest_wrapped_e:
+        logger.error_and_exit("calling-error-and-exit", exit_code=42)
+    assert pytest_wrapped_e.type == SystemExit
+    assert pytest_wrapped_e.value.code == 42
 
     logger.info(f"test {name}")
