@@ -653,15 +653,26 @@ class RemoteHost(Host):
     def __init__(
         self,
         host: str,
-        *logins: _Login,
+        *logins: Union[_Login, str],
         sudo: bool = False,
         login_retry_duration: float = 10 * 60,
     ) -> None:
+
+        logins2 = tuple(
+            (AutoLogin(user=login) if isinstance(login, str) else login)
+            for login in logins
+        )
+        if not logins2:
+            user = os.environ.get("USER")
+            if not user:
+                raise ValueError("Unknown USER to login at RemoteHost()")
+            logins2 = (AutoLogin(user),)
+
         import paramiko
 
         super().__init__(sudo=sudo)
         self.host = host
-        self.logins = tuple(logins)
+        self.logins = logins2
         self.login_retry_duration = login_retry_duration
         self._paramiko = paramiko
         self._tlocal = threading.local()
