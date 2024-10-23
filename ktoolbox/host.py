@@ -21,6 +21,8 @@ from typing import Callable
 from typing import Optional
 from typing import Union
 
+from . import common
+
 
 INTERNAL_ERROR_PREFIX = "Host.run(): "
 INTERNAL_ERROR_RETURNCODE = 1
@@ -30,10 +32,6 @@ logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 
 _unique_log_id_value = 0
-
-# Same as common.KW_ONLY_DATACLASS, but we should not use common module here.
-# See common.KW_ONLY_DATACLASS why this is used.
-KW_ONLY_DATACLASS = {"kw_only": True} if "kw_only" in dataclass.__kwdefaults__ else {}
 
 
 def _normalize_cmd(
@@ -89,14 +87,14 @@ def _unique_log_id() -> int:
 class _BaseResult(ABC, typing.Generic[AnyStr]):
     # _BaseResult only exists to have the first 3 parameters positional
     # arguments and the subsequent parameters (in BaseResult) marked as
-    # KW_ONLY_DATACLASS. Once we no longer support Python 3.9, the classes
-    # can be merged.
+    # common.KW_ONLY_DATACLASS. Once we no longer support Python 3.9, the
+    # classes can be merged.
     out: AnyStr
     err: AnyStr
     returncode: int
 
 
-@dataclass(frozen=True, **KW_ONLY_DATACLASS)
+@dataclass(frozen=True, **common.KW_ONLY_DATACLASS)
 class BaseResult(_BaseResult[AnyStr]):
     # In most cases, "success" is the same as checking for returncode zero.  In
     # some cases, it can be overwritten to be of a certain value.
@@ -640,7 +638,7 @@ class _Login(ABC):
         pass
 
 
-@dataclass(frozen=True, **KW_ONLY_DATACLASS)
+@dataclass(frozen=True, **common.KW_ONLY_DATACLASS)
 class AutoLogin(_Login):
     def _login(self, client: "paramiko.SSHClient", host: str) -> None:
         client.connect(
