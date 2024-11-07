@@ -4,6 +4,7 @@ import os
 import re
 import select
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -101,6 +102,22 @@ def _cmd_with_sudo(
     cmd2.extend(_cmd_to_argv(cmd))
 
     return tuple(cmd2)
+
+
+def _path_make_absolute(
+    path: Union[str, os.PathLike[Any]],
+    *,
+    cwd: Optional[str] = None,
+) -> str:
+    path = str(path)
+    if os.path.isabs(path):
+        return path
+    if cwd is None:
+        # We cannot make this path absolute. The Host will determine
+        # the base of the path, and it is rather unpredictable. Avoid
+        # relative paths due to that.
+        return path
+    return os.path.join(cwd, path)
 
 
 def _pr_kill(
@@ -308,7 +325,9 @@ class Host(ABC):
         *,
         sudo: bool = False,
     ) -> None:
-        self._sudo = sudo
+        self._lock = threading.Lock()
+        self._has_sudo: Optional[bool] = None
+        self.sudo = sudo
 
     @abstractmethod
     def pretty_str(self) -> str:
@@ -340,7 +359,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -362,7 +381,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -384,7 +403,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -407,7 +426,7 @@ class Host(ABC):
         sudo: Optional[bool] = None,
         cwd: Optional[str] = None,
         log_prefix: str = "",
-        log_level: int = logging.DEBUG,
+        log_level: Optional[int] = None,
         log_level_result: Optional[int] = None,
         log_level_fail: Optional[int] = None,
         log_lineoutput: Union[bool, int] = False,
@@ -421,8 +440,13 @@ class Host(ABC):
     ) -> Union[Result, BinResult]:
         log_id = _unique_log_id()
 
-        if sudo is None:
-            sudo = self._sudo
+        if log_level is None:
+            if log_level_result is None:
+                log_level = logging.DEBUG
+            else:
+                log_level = -1
+
+        sudo = self.get_effective_sudo(sudo)
 
         real_cmd, real_env, real_cwd = self._prepare_run(
             cmd=cmd,
@@ -615,9 +639,14 @@ class Host(ABC):
                 assert str_result is not None
                 debug_str = str_result.debug_str(with_output=with_output)
 
+            if log_level >= 0:
+                result_kind = "└──>"
+            else:
+                result_kind = ">"
+
             logger.log(
                 result_log_level,
-                f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: └──> {_cmd_to_logstr(real_cmd)}:{status_msg} {debug_str}",
+                f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {result_kind} {_cmd_to_logstr(real_cmd)}:{status_msg} {debug_str}",
             )
 
         if decode_exception:
@@ -649,8 +678,84 @@ class Host(ABC):
     ) -> BinResult:
         pass
 
-    def file_exists(self, path: Union[str, os.PathLike[Any]]) -> bool:
-        return self.run(["test", "-e", str(path)], log_level=-1, text=False).success
+    def get_effective_sudo(self, sudo: Optional[bool] = None) -> bool:
+        if sudo is None:
+            return self.sudo
+        return sudo
+
+    def has_sudo(
+        self,
+        *,
+        force_recheck: bool = False,
+        log_level: int = logging.DEBUG,
+    ) -> bool:
+        force_recheck = bool(force_recheck)
+        with self._lock:
+            if not force_recheck:
+                if self._has_sudo is not None:
+                    return self._has_sudo
+        res = self.run(
+            ["sudo", "-n", "whoami"],
+            text=False,
+            sudo=False,
+            log_level_result=log_level,
+        )
+        has = res.match(
+            out=re.compile(b"^[-a-zA-Z_][-a-zA-Z_0-9]*\n$"),
+            err=b"",
+            returncode=0,
+        )
+        with self._lock:
+            if not force_recheck:
+                if self._has_sudo is not None:
+                    return self._has_sudo
+            self._has_sudo = has
+        return has
+
+    def file_exists(
+        self,
+        path: Union[str, os.PathLike[Any]],
+        *,
+        cwd: Optional[str] = None,
+        sudo: Optional[bool] = None,
+        is_dir: Optional[bool] = None,
+        log_prefix: str = "",
+        log_level: int = -1,
+    ) -> bool:
+        if is_dir is None:
+            flag = "-e"
+        elif is_dir:
+            flag = "-d"
+        else:
+            flag = "-f"
+        res = self.run(
+            ["test", flag, str(path)],
+            text=False,
+            cwd=cwd,
+            sudo=sudo,
+            log_prefix=log_prefix,
+            log_level_result=log_level,
+        )
+        return res.success
+
+    def file_remove(
+        self,
+        path: Union[str, os.PathLike[Any]],
+        *,
+        cwd: Optional[str] = None,
+        sudo: Optional[bool] = None,
+        log_prefix: str = "",
+        log_level: int = logging.DEBUG,
+    ) -> bool:
+        res = self.run(
+            ["rm", "-rf", str(path)],
+            text=False,
+            cwd=cwd,
+            sudo=sudo,
+            log_prefix=log_prefix,
+            log_level_result=log_level,
+        )
+        return res.success
 
 
 class LocalHost(Host):
@@ -821,8 +926,97 @@ class LocalHost(Host):
             cancelled=terminate_state >= 0,
         )
 
-    def file_exists(self, path: Union[str, os.PathLike[Any]]) -> bool:
-        return os.path.exists(path)
+    def file_exists(
+        self,
+        path: Union[str, os.PathLike[Any]],
+        *,
+        cwd: Optional[str] = None,
+        sudo: Optional[bool] = None,
+        is_dir: Optional[bool] = None,
+        log_prefix: str = "",
+        log_level: int = -1,
+    ) -> bool:
+        if self.get_effective_sudo(sudo):
+            return super().file_exists(
+                path,
+                cwd=cwd,
+                sudo=sudo,
+                is_dir=is_dir,
+                log_prefix=log_prefix,
+                log_level=log_level,
+            )
+
+        path = _path_make_absolute(path, cwd=cwd)
+
+        if is_dir is None:
+            exists = os.path.exists(path)
+            kind = "file"
+        elif is_dir:
+            exists = os.path.isdir(path)
+            kind = "dir"
+        else:
+            exists = os.path.isfile(path)
+            kind = "regular file"
+
+        if log_level >= 0:
+            log_id = _unique_log_id()
+            logger.log(
+                log_level,
+                f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {kind} {repr(path)} exists: {exists}",
+            )
+
+        return exists
+
+    def file_remove(
+        self,
+        path: Union[str, os.PathLike[Any]],
+        *,
+        cwd: Optional[str] = None,
+        sudo: Optional[bool] = None,
+        log_prefix: str = "",
+        log_level: int = logging.DEBUG,
+    ) -> bool:
+        if self.get_effective_sudo(sudo):
+            return super().file_remove(
+                path,
+                cwd=cwd,
+                sudo=sudo,
+                log_prefix=log_prefix,
+                log_level=log_level,
+            )
+
+        path = _path_make_absolute(path, cwd=cwd)
+
+        try:
+            os.remove(path)
+        except IsADirectoryError:
+            try:
+                shutil.rmtree(path, ignore_errors=False)
+            except FileNotFoundError:
+                result, msg = True, "directory does not exist"
+            except Exception as e:
+                result, msg = False, f"failed: {e}"
+            else:
+                result, msg = True, "directory deleted"
+        except FileNotFoundError:
+            result, msg = True, "file does not exist"
+        except Exception as e:
+            result, msg = False, f"failed: {e}"
+        else:
+            result, msg = True, "file deleted"
+
+        if log_level >= 0:
+            if result:
+                logmsg = f"file {repr(path)} deleted ({msg})"
+            else:
+                logmsg = f"file {repr(path)} failed to delete ({msg})"
+            log_id = _unique_log_id()
+            logger.log(
+                log_level,
+                f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {logmsg}",
+            )
+
+        return result
 
 
 @dataclass(frozen=True)

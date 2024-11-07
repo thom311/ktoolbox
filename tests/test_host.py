@@ -5,6 +5,7 @@ import pathlib
 import pytest
 import random
 import re
+import shlex
 import sys
 import time
 
@@ -18,6 +19,14 @@ from ktoolbox import host
 
 
 common.log_config_logger(logging.DEBUG, "ktoolbox")
+
+
+def rnd_one_in(n: int) -> bool:
+    return random.randint(0, n - 1) == 0
+
+
+def rnd_bool() -> bool:
+    return rnd_one_in(2)
 
 
 def rnd_run_extraargs() -> dict[str, Any]:
@@ -77,15 +86,14 @@ def rnd_cancel_in_background(delay: float = 0) -> common.Cancellable:
     return cancellable
 
 
+def _system(cmd: str) -> None:
+    r = os.system(cmd)
+    assert r == 0
+
+
 @functools.cache
 def get_user() -> Optional[str]:
     return os.environ.get("USER")
-
-
-@functools.cache
-def has_sudo(rsh: host.Host) -> bool:
-    r = rsh.run("sudo -n whoami")
-    return r == host.Result("root\n", "", 0)
 
 
 @functools.cache
@@ -100,7 +108,12 @@ def has_paramiko() -> bool:
 
 
 @functools.cache
-def can_ssh_nopass(hostname: str, user: str) -> Optional[host.RemoteHost]:
+def can_ssh_nopass(
+    hostname: str,
+    user: str,
+    *,
+    sudo: bool = False,
+) -> Optional[host.RemoteHost]:
 
     if not has_paramiko():
         return None
@@ -120,8 +133,11 @@ def can_ssh_nopass(hostname: str, user: str) -> Optional[host.RemoteHost]:
         s_err = _err.read()
         rc = _out.channel.recv_exit_status()
         if rc == 0 and s_out == b"hello" and s_err == b"":
-            rsh = host.RemoteHost(hostname, host.AutoLogin(user))
-            assert rsh.run("whoami") == host.Result(f"{user}\n", "", 0)
+            rsh = host.RemoteHost(hostname, host.AutoLogin(user), sudo=sudo)
+            res = rsh.run("whoami")
+            effective_user = "root" if sudo else user
+            if res != host.Result(f"{effective_user}\n", "", 0):
+                return None
             return rsh
     return None
 
@@ -151,18 +167,20 @@ def skip_without_paramiko() -> None:
 def skip_without_ssh_nopass(
     hostname: str = "localhost",
     user: Optional[str] = None,
+    *,
+    sudo: bool = False,
 ) -> tuple[str, host.RemoteHost]:
     if user is None:
         user = get_user() or "root"
     skip_without_paramiko()
-    rsh = can_ssh_nopass(hostname, user)
+    rsh = can_ssh_nopass(hostname, user, sudo=sudo)
     if rsh is None:
         pytest.skip(f"cannot ssh to {user}@{hostname} without password")
     return user, rsh
 
 
 def skip_without_sudo(rsh: host.Host) -> None:
-    if not has_sudo(rsh):
+    if not rsh.has_sudo():
         pytest.skip(f"sudo on {rsh.pretty_str()} does not seem to work passwordless")
 
 
@@ -618,3 +636,213 @@ def test_cancellable_1_remote() -> None:
     user, rsh = skip_without_ssh_nopass()
     skip_without_sudo(rsh)
     _test_cancellable_1(rsh)
+
+
+def _test_file_remove(rsh: host.Host, tmp_path: pathlib.Path) -> None:
+    def _cleanup_basedir(basedir: str) -> None:
+        cmd = ["rm", "-rf", basedir]
+        if host.local.has_sudo():
+            host.local.run(cmd, sudo=True)
+        else:
+            host.local.run(cmd, sudo=False)
+        assert not os.path.exists(basedir)
+
+    def _file_exists(
+        rsh: host.Host,
+        path: str,
+        *,
+        sudo: Optional[bool] = None,
+        is_dir: Optional[bool] = None,
+    ) -> bool:
+        assert path
+        assert path[0] == "/"
+
+        if rnd_bool():
+            file = path
+            cwd = None
+        else:
+            file = os.path.basename(path)
+            cwd = os.path.dirname(path)
+
+        return rsh.file_exists(
+            file,
+            cwd=cwd,
+            sudo=sudo,
+            is_dir=is_dir,
+        )
+
+    def _file_remove(
+        rsh: host.Host,
+        path: str,
+        *,
+        sudo: Optional[bool] = None,
+    ) -> bool:
+        assert path
+        assert path[0] == "/"
+
+        if rnd_bool():
+            file = path
+            cwd = None
+        else:
+            file = os.path.basename(path)
+            cwd = os.path.dirname(path)
+
+        return rsh.file_remove(
+            file,
+            cwd=cwd,
+            sudo=sudo,
+        )
+
+    def _assert_exists(
+        path: str,
+        *,
+        rsh: Optional[host.Host] = None,
+        is_dir: Optional[bool] = None,
+        sudo: Optional[bool] = None,
+    ) -> None:
+        if sudo is not None and sudo:
+            if os.path.exists(path):
+                if is_dir is not None:
+                    if is_dir:
+                        assert os.path.isdir(path)
+                    else:
+                        assert os.path.isfile(path)
+        else:
+            assert os.path.exists(path)
+            if is_dir is not None:
+                if is_dir:
+                    assert os.path.isdir(path)
+                else:
+                    assert os.path.isfile(path)
+        if rnd_one_in(5):
+            assert _file_exists(
+                host.local,
+                path,
+                sudo=sudo,
+                is_dir=random.choice([None, is_dir]),
+            )
+        if rsh is not None and rsh is not host.local and rnd_one_in(5):
+            assert _file_exists(
+                rsh,
+                path,
+                sudo=sudo,
+                is_dir=random.choice([None, is_dir]),
+            )
+
+    def _assert_not_exists(
+        path: str,
+        *,
+        rsh: Optional[host.Host] = None,
+        allow_with_sudo: bool = True,
+        allow_without_sudo: bool = True,
+    ) -> None:
+        assert not os.path.exists(path)
+
+        def _effective_sudo(rsh: host.Host) -> Optional[bool]:
+            if allow_without_sudo and allow_with_sudo:
+                return random.choice([None, False, True])
+            if allow_without_sudo:
+                if not rsh.sudo:
+                    return random.choice([None, False])
+                return False
+            if rsh.sudo:
+                return random.choice([None, True])
+            return True
+
+        if rnd_one_in(5):
+            assert not _file_exists(
+                host.local,
+                path,
+                sudo=_effective_sudo(host.local),
+                is_dir=random.choice([None, False, True]),
+            )
+        if rsh is not None and rsh is not host.local and rnd_one_in(5):
+            assert not _file_exists(
+                rsh,
+                path,
+                sudo=_effective_sudo(rsh),
+                is_dir=random.choice([None, False, True]),
+            )
+
+    def _run_one(basedir: str) -> None:
+        _system(f"mkdir {shlex.quote(basedir)}")
+        _assert_exists(basedir, rsh=rsh, is_dir=True)
+
+        path = os.path.join(basedir, f"name-{i}")
+
+        is_dir = rnd_bool()
+        if is_dir:
+            _system(f"mkdir {shlex.quote(path)}")
+        else:
+            _system(f"touch {shlex.quote(path)}")
+        _assert_exists(path, rsh=rsh, is_dir=is_dir)
+
+        is_dir_full = is_dir and rnd_bool()
+        if is_dir_full:
+            path2 = os.path.join(path, "file1")
+            _system(f"touch {shlex.quote(path2)}")
+            _assert_exists(path2, rsh=rsh, is_dir=False)
+
+        _system(f"chmod 700 {shlex.quote(os.path.dirname(path))}")
+
+        requires_sudo = host.local.has_sudo() and rnd_bool()
+        if requires_sudo:
+            assert host.local.run(
+                ["chown", "root:root", os.path.dirname(path)],
+                sudo=True,
+            )
+
+        _assert_exists(os.path.dirname(path), rsh=rsh, is_dir=True)
+
+        if not requires_sudo or os.path.exists(path):
+            _assert_exists(path, rsh=rsh, is_dir=is_dir)
+
+        use_sudo = random.choice([None, False, True])
+
+        success = _file_remove(
+            rsh,
+            path,
+            sudo=use_sudo,
+        )
+
+        if not success:
+            if requires_sudo and not os.path.exists(path):
+                _assert_not_exists(path, rsh=rsh, allow_with_sudo=False)
+            else:
+                _assert_exists(path, rsh=rsh, is_dir=is_dir, sudo=requires_sudo)
+            if rsh.has_sudo():
+                assert not rsh.get_effective_sudo(use_sudo)
+                assert requires_sudo
+            else:
+                assert rsh.get_effective_sudo(use_sudo) or requires_sudo
+        else:
+            _assert_not_exists(path, rsh=rsh)
+
+    basedir = str(tmp_path / "base")
+    _cleanup_basedir(basedir)
+    for i in range(5):
+        try:
+            _run_one(basedir)
+        finally:
+            _cleanup_basedir(basedir)
+
+
+def test_file_remove_local_1(tmp_path: pathlib.Path) -> None:
+    _test_file_remove(host.local, tmp_path)
+
+
+def test_file_remove_local_2(tmp_path: pathlib.Path) -> None:
+    rsh = host.LocalHost(sudo=True)
+    skip_without_sudo(rsh)
+    _test_file_remove(rsh, tmp_path)
+
+
+def test_file_remove_remote_1(tmp_path: pathlib.Path) -> None:
+    user, rsh = skip_without_ssh_nopass()
+    _test_file_remove(rsh, tmp_path)
+
+
+def test_file_remove_remote_2(tmp_path: pathlib.Path) -> None:
+    user, rsh = skip_without_ssh_nopass(sudo=True)
+    skip_without_sudo(rsh)
+    _test_file_remove(rsh, tmp_path)
