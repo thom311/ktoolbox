@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import typing
+import weakref
 
 from collections.abc import Iterable
 from collections.abc import Mapping
@@ -1092,11 +1093,51 @@ def structparse_pop_objlist_to_dict(
     return {k: v[1] for k, v in result.items()}
 
 
+class DeferredReference:
+    _lock: typing.ClassVar[threading.Lock] = threading.Lock()
+
+    def init(self, val: Any) -> None:
+        ref: Optional[weakref.ref[Any]]
+        if val is None:
+            ref = None
+        else:
+            ref = weakref.ref(val)
+        with self._lock:
+            if hasattr(self, "_ref"):
+                raise RuntimeError("Reference can only be initialized once")
+            setattr(self, "_ref", ref)
+
+    def get(self, typ: type[T]) -> T:
+        ref: Optional[weakref.ref[Any]]
+        ref2: Any
+        with self._lock:
+            try:
+                ref = getattr(self, "_ref")
+            except AttributeError:
+                raise RuntimeError("Reference not set") from None
+        if ref is None:
+            ref2 = None
+        else:
+            ref2 = ref()
+            if ref2 is None:
+                raise RuntimeError("Reference already destroyed")
+        if not isinstance(ref2, typ):
+            raise RuntimeError("Reference has unexpected type")
+        return ref2
+
+
 @strict_dataclass
 @dataclass(frozen=True, **KW_ONLY_DATACLASS)
 class StructParseBase(abc.ABC):
     yamlpath: str
     yamlidx: int
+
+    _owner_reference: DeferredReference = dataclasses.field(
+        default_factory=DeferredReference,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     @abc.abstractmethod
     def serialize(self) -> Union[dict[str, Any], list[Any]]:
