@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import os
 import pytest
 import random
 import sys
@@ -1206,3 +1207,46 @@ def test_structparse_pop_objlist_as_dict() -> None:
 def test_future_thread() -> None:
     thread = common.FutureThread(lambda th: host.local.run("echo hi"), start=True)
     assert thread.join_and_result() == host.Result("hi\n", "", 0)
+
+
+def test_path_norm() -> None:
+
+    @dataclasses.dataclass
+    class Conf:
+        arg: str
+        result: str
+        normpath: Optional[str] = None
+        cwd: Optional[str] = None
+        preserve_dir: bool = True
+
+    confs = [
+        Conf("", "."),
+        Conf(".", "."),
+        Conf("/tmp/.", "/tmp/", normpath="/tmp"),
+        Conf("/a/..//././bbb///", "/a/../bbb/", normpath="/bbb"),
+        Conf("//..//././bbb///", "/../bbb/", normpath="//bbb"),
+        Conf("/a/..//././bbb/..///", "/a/../bbb/../", normpath="/"),
+        Conf("/tmp", "/tmp"),
+        Conf("tmp", "tmp"),
+        Conf("tmp", "/tmp", normpath="tmp", cwd="/"),
+        Conf("/tmp/", "/tmp/", normpath="/tmp"),
+        Conf("/tmp/.", "/tmp/", normpath="/tmp"),
+        Conf("/tmp/.", "/tmp", preserve_dir=False),
+        Conf("/tmp/", "/tmp", preserve_dir=False),
+    ]
+    for conf in confs:
+        r1 = common.path_norm(
+            conf.arg,
+            cwd=conf.cwd,
+            preserve_dir=conf.preserve_dir,
+        )
+        assert isinstance(r1, str)
+        assert r1 == conf.result
+
+        r2 = os.path.normpath(conf.arg)
+        assert isinstance(r1, str)
+        if conf.normpath is None:
+            assert r2 == conf.result
+        else:
+            assert r2 == conf.normpath
+            assert conf.result != conf.normpath

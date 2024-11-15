@@ -245,6 +245,56 @@ def unwrap(val: Optional[T], *, or_else: Optional[T] = None) -> T:
     return val
 
 
+def path_norm(
+    path: str,
+    *,
+    cwd: Optional[str] = None,
+    preserve_dir: bool = True,
+) -> str:
+    """
+    Normalize a path while preserving symbolic links and other specific rules.
+
+    Parameters:
+    path (str): The path to normalize.
+    cwd (Optional[str]): If provided, relative paths are joined with this base
+      directory.
+    preserve_dir (bool): If True and the path is a directory, the trailing
+      slash is preserved.
+
+    Returns:
+    str: The normalized path.
+
+    Notes:
+    - This function is similar to `os.path.normpath()`, but with key differences:
+      - Unlike `normpath()`, this function **does not remove `..`** components,
+        preserving their meaning (important when symbolic links are involved).
+      - `normpath()` keeps leading `//`, which is undesired in most cases. This
+        function collapses all duplicate slashes into a single `/`.
+    """
+    is_abs = path.startswith("/")
+    if not is_abs and cwd:
+        path = os.path.join(cwd, path)
+        is_abs = path.startswith("/")
+
+    parts: list[str] = []
+    trailing_slash = False
+    for part in path.split("/"):
+        if part == "" or part == ".":
+            trailing_slash = True
+            continue
+        trailing_slash = False
+        parts.append(part)
+
+    if not parts:
+        return "/" if is_abs else "."
+    joined = "/".join(parts)
+    if is_abs:
+        joined = "/" + joined
+    if trailing_slash and preserve_dir:
+        joined = joined + "/"
+    return joined
+
+
 def enum_convert(
     enum_type: type[E],
     value: Any,
