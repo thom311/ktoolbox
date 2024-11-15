@@ -5,6 +5,7 @@ import functools
 import json
 import logging
 import os
+import pathlib
 import re
 import sys
 import threading
@@ -245,17 +246,21 @@ def unwrap(val: Optional[T], *, or_else: Optional[T] = None) -> T:
     return val
 
 
+TPathNormPath = TypeVar("TPathNormPath", bound=Union[None, str, pathlib.Path])
+
+
 def path_norm(
-    path: str,
+    path: TPathNormPath,
     *,
-    cwd: Optional[str] = None,
-    preserve_dir: bool = True,
-) -> str:
+    cwd: Optional[Union[str, pathlib.Path]] = None,
+    preserve_dir: bool = False,
+) -> TPathNormPath:
     """
     Normalize a path while preserving symbolic links and other specific rules.
 
     Parameters:
-    path (str): The path to normalize.
+    path (str): The path to normalize. None is allowed and results in None.
+      pathlib.Path arguments are allowed and the result will also be a Path.
     cwd (Optional[str]): If provided, relative paths are joined with this base
       directory.
     preserve_dir (bool): If True and the path is a directory, the trailing
@@ -271,14 +276,30 @@ def path_norm(
       - `normpath()` keeps leading `//`, which is undesired in most cases. This
         function collapses all duplicate slashes into a single `/`.
     """
-    is_abs = path.startswith("/")
-    if not is_abs and cwd:
-        path = os.path.join(cwd, path)
-        is_abs = path.startswith("/")
+    if path is None:
+        return None
+
+    path_orig = path
+
+    if isinstance(path, pathlib.Path):
+        path_str = str(path)
+    else:
+        assert isinstance(path, str)
+        path_str = path
+
+    path_orig_str = path_str
+
+    is_abs = path_str.startswith("/")
+    if not is_abs and cwd is not None:
+        if isinstance(cwd, pathlib.Path):
+            cwd = str(cwd)
+        if cwd:
+            path_str = os.path.join(cwd, path_str)
+            is_abs = path_str.startswith("/")
 
     parts: list[str] = []
     trailing_slash = False
-    for part in path.split("/"):
+    for part in path_str.split("/"):
         if part == "" or part == ".":
             trailing_slash = True
             continue
@@ -286,13 +307,21 @@ def path_norm(
         parts.append(part)
 
     if not parts:
-        return "/" if is_abs else "."
-    joined = "/".join(parts)
-    if is_abs:
-        joined = "/" + joined
-    if trailing_slash and preserve_dir:
-        joined = joined + "/"
-    return joined
+        result = "/" if is_abs else "."
+    else:
+        result = "/".join(parts)
+        if is_abs:
+            result = "/" + result
+        if trailing_slash and preserve_dir:
+            result = result + "/"
+
+    if result == path_orig_str:
+        # The result is still the same as the orignal string. Return
+        # the original instance.
+        return path_orig
+    if isinstance(path_orig, pathlib.Path):
+        return typing.cast(TPathNormPath, (type(path_orig))(result))
+    return typing.cast(TPathNormPath, result)
 
 
 def enum_convert(

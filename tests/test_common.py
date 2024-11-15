@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import os
+import pathlib
 import pytest
 import random
 import sys
@@ -1219,6 +1220,18 @@ def test_path_norm() -> None:
         cwd: Optional[str] = None
         preserve_dir: bool = True
 
+        @property
+        def cwd_randomly_as_path(self) -> Optional[Union[str, pathlib.Path]]:
+            if self.cwd is None:
+                return None
+            return random.choice([conf.cwd, pathlib.Path(self.cwd)])
+
+        @property
+        def result_no_trailing_slash(self) -> str:
+            if len(self.result) > 1 and self.result[-1] == "/":
+                return self.result[:-1]
+            return self.result
+
     confs = [
         Conf("", "."),
         Conf(".", "."),
@@ -1237,11 +1250,24 @@ def test_path_norm() -> None:
     for conf in confs:
         r1 = common.path_norm(
             conf.arg,
-            cwd=conf.cwd,
+            cwd=conf.cwd_randomly_as_path,
             preserve_dir=conf.preserve_dir,
         )
         assert isinstance(r1, str)
         assert r1 == conf.result
+        if conf.arg == conf.result:
+            assert r1 is conf.arg
+
+        parg = pathlib.Path(conf.arg)
+        p1 = common.path_norm(
+            parg,
+            cwd=conf.cwd_randomly_as_path,
+            preserve_dir=conf.preserve_dir,
+        )
+        assert isinstance(p1, pathlib.Path)
+        assert str(p1) == conf.result_no_trailing_slash
+        if conf.arg == conf.result:
+            assert p1 is parg
 
         r2 = os.path.normpath(conf.arg)
         assert isinstance(r1, str)
