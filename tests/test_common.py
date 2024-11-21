@@ -18,6 +18,7 @@ from ktoolbox import host
 from ktoolbox.common import enum_convert
 from ktoolbox.common import enum_convert_list
 from ktoolbox.common import serialize_enum
+from ktoolbox.common import StructParsePopContext
 
 
 class ReachedError(Exception):
@@ -632,26 +633,39 @@ def test_serial() -> None:
         common.Serial("")
 
 
+def _pargs(
+    arg: Union[common._MISSING_TYPE, Optional[Any]] = common.MISSING,
+    *,
+    vdict: Optional[dict[str, Any]] = None,
+    key: str = "foo",
+) -> StructParsePopContext:
+    if vdict is None:
+        vdict = {}
+    if not isinstance(arg, common._MISSING_TYPE):
+        vdict[key] = arg
+    return StructParsePopContext(vdict, "path", key)
+
+
 def test_structparse_with() -> None:
 
-    with common.structparse_with_strdict({}, "path") as varg:
+    with common.structparse_with_strdict({}, "path") as pargs:
         with pytest.raises(ValueError):
-            v1 = common.structparse_pop_str(*varg.for_key("v1"))
+            v1 = common.structparse_pop_str(pargs.for_key("v1"))
             if sys.version_info >= (3, 10):
                 typing.assert_type(v1, str)
 
-        v22 = common.structparse_pop_list({}, "path", "foo")
+        v22 = common.structparse_pop_list(_pargs())
         if sys.version_info >= (3, 10):
             typing.assert_type(v22, list[Any])
         assert v22 == []
 
-        v33n = common.structparse_pop_list(*varg.for_key("v33n"))
+        v33n = common.structparse_pop_list(pargs.for_key("v33n"))
         if sys.version_info >= (3, 10):
             typing.assert_type(v33n, list[Any])
         assert v33n == []
 
         v3 = common.structparse_pop_enum(
-            *varg.for_key("v3"),
+            pargs.for_key("v3"),
             enum_type=TstTestType,
             default=TstTestType.IPERF_TCP,
         )
@@ -660,7 +674,7 @@ def test_structparse_with() -> None:
         assert v3 == TstTestType.IPERF_TCP
 
         v4 = common.structparse_pop_enum(
-            *varg.for_key("v3"),
+            pargs.for_key("v3"),
             enum_type=TstTestType,
             default=None,
         )
@@ -671,18 +685,12 @@ def test_structparse_with() -> None:
 
 def test_structparse_pop_str_1() -> None:
     with pytest.raises(ValueError):
-        val0 = common.structparse_pop_str(
-            {},
-            "path",
-            "foo",
-        )
+        val0 = common.structparse_pop_str(_pargs())
         if sys.version_info >= (3, 10):
             typing.assert_type(val0, str)
 
     val1 = common.structparse_pop_str(
-        {},
-        "path",
-        "foo",
+        _pargs(),
         default=None,
     )
     if sys.version_info >= (3, 10):
@@ -690,9 +698,7 @@ def test_structparse_pop_str_1() -> None:
     assert val1 is None
 
     val2 = common.structparse_pop_str(
-        {},
-        "path",
-        "foo",
+        _pargs(),
         default="defval",
     )
     if sys.version_info >= (3, 10):
@@ -700,18 +706,14 @@ def test_structparse_pop_str_1() -> None:
     assert val2 == "defval"
 
     val3 = common.structparse_pop_str(
-        {"foo": "strval"},
-        "path",
-        "foo",
+        _pargs("strval"),
     )
     if sys.version_info >= (3, 10):
         typing.assert_type(val3, str)
     assert val3 == "strval"
 
     val4 = common.structparse_pop_str(
-        {"foo": "strval"},
-        "path",
-        "foo",
+        _pargs("strval"),
         default=None,
     )
     if sys.version_info >= (3, 10):
@@ -719,9 +721,7 @@ def test_structparse_pop_str_1() -> None:
     assert val4 == "strval"
 
     val5 = common.structparse_pop_str(
-        {"foo": "strval"},
-        "path",
-        "foo",
+        _pargs("strval"),
         default="defval",
     )
     if sys.version_info >= (3, 10):
@@ -730,13 +730,6 @@ def test_structparse_pop_str_1() -> None:
 
 
 def test_structparse_pop_str_empty() -> None:
-    def varg() -> tuple[dict[str, Any], str, str]:
-        return (
-            {"foo": ""},
-            "path",
-            "foo",
-        )
-
     def _check(x: str) -> bool:
         assert x == ""
         raise ReachedError("I am here")
@@ -752,34 +745,34 @@ def test_structparse_pop_str_empty() -> None:
 
     # if nothing specified, empty values are rejected.
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg())
+        common.structparse_pop_str(_pargs(""))
 
     # If we have a default, the empty value maps to the default.
-    assert common.structparse_pop_str(*varg(), default=None) is None
-    assert common.structparse_pop_str(*varg(), default="xxx") == "xxx"
+    assert common.structparse_pop_str(_pargs(""), default=None) is None
+    assert common.structparse_pop_str(_pargs(""), default="xxx") == "xxx"
 
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), empty_as_default=None)
-    assert common.structparse_pop_str(*varg(), empty_as_default=False) == ""
+        common.structparse_pop_str(_pargs(""), empty_as_default=None)
+    assert common.structparse_pop_str(_pargs(""), empty_as_default=False) == ""
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), empty_as_default=True)
+        common.structparse_pop_str(_pargs(""), empty_as_default=True)
 
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), allow_empty=None)
+        common.structparse_pop_str(_pargs(""), allow_empty=None)
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), allow_empty=False)
-    assert common.structparse_pop_str(*varg(), allow_empty=True) == ""
+        common.structparse_pop_str(_pargs(""), allow_empty=False)
+    assert common.structparse_pop_str(_pargs(""), allow_empty=True) == ""
 
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), check=None)
+        common.structparse_pop_str(_pargs(""), check=None)
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), check=_check)
+        common.structparse_pop_str(_pargs(""), check=_check)
 
     for i in range(1000):
 
         with pytest.raises(ValueError):
             common.structparse_pop_str(
-                *varg(),
+                _pargs(""),
                 default=random.choice([common.MISSING, None, "xxx"]),
                 empty_as_default=random.choice([None, False, True]),
                 allow_empty=False,
@@ -789,7 +782,7 @@ def test_structparse_pop_str_empty() -> None:
         d1 = random.choice([None, "xxx"])
         assert (
             common.structparse_pop_str(
-                *varg(),
+                _pargs(""),
                 default=d1,
                 empty_as_default=True,
                 allow_empty=random.choice([None, True]),
@@ -800,7 +793,7 @@ def test_structparse_pop_str_empty() -> None:
 
         assert (
             common.structparse_pop_str(
-                *varg(),
+                _pargs(""),
                 default=random.choice([None, "xxx"]),
                 empty_as_default=False,
                 allow_empty=random.choice([None, True]),
@@ -810,7 +803,7 @@ def test_structparse_pop_str_empty() -> None:
         )
         with pytest.raises(ReachedError):
             common.structparse_pop_str(
-                *varg(),
+                _pargs(""),
                 default=random.choice([None, "xxx"]),
                 empty_as_default=False,
                 allow_empty=random.choice([None, True]),
@@ -819,52 +812,48 @@ def test_structparse_pop_str_empty() -> None:
 
     assert (
         common.structparse_pop_str(
-            *varg(),
+            _pargs(""),
             default="xxx",
             empty_as_default=False,
         )
         == ""
     )
 
-    assert common.structparse_pop_str(*varg(), default="xxx", check=_check) == "xxx"
+    assert common.structparse_pop_str(_pargs(""), default="xxx", check=_check) == "xxx"
     assert (
         common.structparse_pop_str(
-            *varg(), default="xxx", empty_as_default=True, check=_check
+            _pargs(""), default="xxx", empty_as_default=True, check=_check
         )
         == "xxx"
     )
     with pytest.raises(ReachedError):
         common.structparse_pop_str(
-            *varg(), default="xxx", empty_as_default=False, check=_check
+            _pargs(""), default="xxx", empty_as_default=False, check=_check
         )
 
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), empty_as_default=True, check=_check)
+        common.structparse_pop_str(_pargs(""), empty_as_default=True, check=_check)
     with pytest.raises(ReachedError):
-        common.structparse_pop_str(*varg(), empty_as_default=False, check=_check)
+        common.structparse_pop_str(_pargs(""), empty_as_default=False, check=_check)
 
     with pytest.raises(ReachedError):
-        common.structparse_pop_str(*varg(), allow_empty=True, check=_check)
+        common.structparse_pop_str(_pargs(""), allow_empty=True, check=_check)
     with pytest.raises(ValueError):
-        common.structparse_pop_str(*varg(), allow_empty=False, check=_check)
+        common.structparse_pop_str(_pargs(""), allow_empty=False, check=_check)
 
 
 def test_structparse_pop_bool() -> None:
     for test_val in (None, "", "default", "-1", "bogus"):
         with pytest.raises(ValueError):
             val0c = common.structparse_pop_bool(
-                {"foo": test_val},
-                "path",
-                "foo",
+                _pargs(test_val),
             )
             if sys.version_info >= (3, 10):
                 typing.assert_type(val0c, bool)
 
     with pytest.raises(ValueError):
         val0a = common.structparse_pop_bool(
-            {"foo": "bogus"},
-            "path",
-            "foo",
+            _pargs("bogus"),
             default=False,
         )
         if sys.version_info >= (3, 10):
@@ -872,9 +861,7 @@ def test_structparse_pop_bool() -> None:
 
     with pytest.raises(ValueError):
         val0b = common.structparse_pop_bool(
-            {"foo": "bogus"},
-            "path",
-            "foo",
+            _pargs("bogus"),
             default=None,
         )
         if sys.version_info >= (3, 10):
@@ -882,9 +869,7 @@ def test_structparse_pop_bool() -> None:
 
     for test_val in (None, "", "default", "-1"):
         val0d = common.structparse_pop_bool(
-            {"foo": test_val},
-            "path",
-            "foo",
+            _pargs(test_val),
             default=False,
         )
         if sys.version_info >= (3, 10):
@@ -893,9 +878,7 @@ def test_structparse_pop_bool() -> None:
 
     for test_val in (None, "", "default", "-1"):
         val0e = common.structparse_pop_bool(
-            {"foo": test_val},
-            "path",
-            "foo",
+            _pargs(test_val),
             default=None,
         )
         if sys.version_info >= (3, 10):
@@ -903,9 +886,7 @@ def test_structparse_pop_bool() -> None:
         assert val0e is None
 
     val1 = common.structparse_pop_bool(
-        {},
-        "path",
-        "foo",
+        _pargs(),
         default=None,
     )
     if sys.version_info >= (3, 10):
@@ -913,9 +894,7 @@ def test_structparse_pop_bool() -> None:
     assert val1 is None
 
     val2 = common.structparse_pop_bool(
-        {},
-        "path",
-        "foo",
+        _pargs(),
         default=False,
     )
     if sys.version_info >= (3, 10):
@@ -923,18 +902,14 @@ def test_structparse_pop_bool() -> None:
     assert val2 is False
 
     val3 = common.structparse_pop_bool(
-        {"foo": "true"},
-        "path",
-        "foo",
+        _pargs("true"),
     )
     if sys.version_info >= (3, 10):
         typing.assert_type(val3, bool)
     assert val3 is True
 
     val4 = common.structparse_pop_bool(
-        {"foo": "1"},
-        "path",
-        "foo",
+        _pargs("1"),
         default=None,
     )
     if sys.version_info >= (3, 10):
@@ -942,9 +917,7 @@ def test_structparse_pop_bool() -> None:
     assert val4 is True
 
     val5 = common.structparse_pop_bool(
-        {"foo": "yes"},
-        "path",
-        "foo",
+        _pargs("yes"),
         default=False,
     )
     if sys.version_info >= (3, 10):
@@ -955,18 +928,14 @@ def test_structparse_pop_bool() -> None:
 def test_structparse_pop_enum() -> None:
     with pytest.raises(ValueError):
         val0 = common.structparse_pop_enum(
-            {},
-            "path",
-            "foo",
+            _pargs(),
             enum_type=TstTestType,
         )
         if sys.version_info >= (3, 10):
             typing.assert_type(val0, TstTestType)
 
     val1 = common.structparse_pop_enum(
-        {},
-        "path",
-        "foo",
+        _pargs(),
         enum_type=TstTestType,
         default=None,
     )
@@ -975,9 +944,7 @@ def test_structparse_pop_enum() -> None:
     assert val1 is None
 
     val2 = common.structparse_pop_enum(
-        {},
-        "path",
-        "foo",
+        _pargs(),
         enum_type=TstTestType,
         default=TstTestType.IPERF_TCP,
     )
@@ -986,9 +953,7 @@ def test_structparse_pop_enum() -> None:
     assert val2 == TstTestType.IPERF_TCP
 
     val3 = common.structparse_pop_enum(
-        {"foo": "http"},
-        "path",
-        "foo",
+        _pargs("http"),
         enum_type=TstTestType,
     )
     if sys.version_info >= (3, 10):
@@ -996,9 +961,7 @@ def test_structparse_pop_enum() -> None:
     assert val3 == TstTestType.HTTP
 
     val4 = common.structparse_pop_enum(
-        {"foo": "http"},
-        "path",
-        "foo",
+        _pargs("http"),
         enum_type=TstTestType,
         default=None,
     )
@@ -1007,9 +970,7 @@ def test_structparse_pop_enum() -> None:
     assert val4 == TstTestType.HTTP
 
     val5 = common.structparse_pop_enum(
-        {"foo": "http"},
-        "path",
-        "foo",
+        _pargs("http"),
         enum_type=TstTestType,
         default=TstTestType.IPERF_TCP,
     )
@@ -1019,19 +980,13 @@ def test_structparse_pop_enum() -> None:
 
 
 def test_structparse_pop_obj() -> None:
-    def args(arg: Optional[Any]) -> tuple[dict[str, Any], str, str]:
-        vdict: dict[str, Any] = {}
-        if arg is not None:
-            vdict["foo"] = arg
-        return vdict, "path", "foo"
-
     def _construct(yamlidx2: int, yamlpath2: str, arg: Any) -> int:
         if arg is None:
             return -1
         return int(arg)
 
     v1 = common.structparse_pop_obj(
-        *args("4"),
+        _pargs("4"),
         construct=_construct,
     )
     if sys.version_info >= (3, 10):
@@ -1040,7 +995,7 @@ def test_structparse_pop_obj() -> None:
 
     with pytest.raises(ValueError):
         v2 = common.structparse_pop_obj(
-            *args(None),
+            _pargs(None),
             construct=_construct,
         )
         if sys.version_info >= (3, 10):
@@ -1048,7 +1003,7 @@ def test_structparse_pop_obj() -> None:
         assert False
 
     v3 = common.structparse_pop_obj(
-        *args(None),
+        _pargs(None),
         construct=_construct,
         default=None,
     )
@@ -1057,7 +1012,7 @@ def test_structparse_pop_obj() -> None:
     assert v3 is None
 
     v4 = common.structparse_pop_obj(
-        *args(None),
+        _pargs(None),
         construct=_construct,
         default=99,
     )
@@ -1066,7 +1021,7 @@ def test_structparse_pop_obj() -> None:
     assert v4 == 99
 
     v5 = common.structparse_pop_obj(
-        *args(None),
+        _pargs(None),
         construct=_construct,
         default="99",
     )
@@ -1075,7 +1030,7 @@ def test_structparse_pop_obj() -> None:
     assert v5 == "99"
 
     v6 = common.structparse_pop_obj(
-        *args(None),
+        _pargs(None),
         construct=_construct,
         construct_default=True,
     )
@@ -1085,51 +1040,45 @@ def test_structparse_pop_obj() -> None:
 
 
 def test_structparse_pop_list() -> None:
-    def args(lst: Optional[list[Any]]) -> tuple[dict[str, Any], str, str]:
-        vdict: dict[str, Any] = {}
-        if lst is not None:
-            vdict["foo"] = lst
-        return vdict, "path", "foo"
-
-    lst1 = common.structparse_pop_list({}, "path", "foo")
+    lst1 = common.structparse_pop_list(_pargs())
     if sys.version_info >= (3, 10):
         typing.assert_type(lst1, list[Any])
     assert lst1 == []
 
-    lst2 = common.structparse_pop_list(*args(None))
+    lst2 = common.structparse_pop_list(_pargs())
     if sys.version_info >= (3, 10):
         typing.assert_type(lst2, list[Any])
     assert lst2 == []
 
     with pytest.raises(ValueError):
-        lst7 = common.structparse_pop_list(*args(None), allow_missing=False)
+        lst7 = common.structparse_pop_list(_pargs(), allow_missing=False)
         if sys.version_info >= (3, 10):
             typing.assert_type(lst7, list[Any])
         assert False
 
-    lst9 = common.structparse_pop_list(*args(None), allow_missing=True)
+    lst9 = common.structparse_pop_list(_pargs(), allow_missing=True)
     if sys.version_info >= (3, 10):
         typing.assert_type(lst9, list[Any])
     assert lst9 == []
 
     with pytest.raises(ValueError):
-        lst17 = common.structparse_pop_list(*args(None), allow_empty=False)
+        lst17 = common.structparse_pop_list(_pargs(), allow_empty=False)
         if sys.version_info >= (3, 10):
             typing.assert_type(lst17, list[Any])
         assert False
 
-    lst19 = common.structparse_pop_list(*args(None), allow_empty=True)
+    lst19 = common.structparse_pop_list(_pargs(), allow_empty=True)
     if sys.version_info >= (3, 10):
         typing.assert_type(lst19, list[Any])
     assert lst19 == []
 
-    lst8 = common.structparse_pop_list(*args([]), allow_missing=False)
+    lst8 = common.structparse_pop_list(_pargs([]), allow_missing=False)
     if sys.version_info >= (3, 10):
         typing.assert_type(lst8, list[Any])
     assert lst8 == []
 
     lst21 = common.structparse_pop_list(
-        *args([]),
+        _pargs([]),
         allow_missing=False,
         allow_empty=True,
     )
@@ -1146,9 +1095,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
         allow_duplicates: bool = False,
     ) -> dict[int, tuple[int, str, int]]:
         val0 = common.structparse_pop_objlist_to_dict(
-            vdict,
-            "path",
-            key,
+            _pargs(vdict=vdict, key=key),
             construct=lambda yamlidx2, yamlpath2, arg: (yamlidx2, yamlpath2, int(arg)),
             get_key=lambda v: int(v[2]),
             allow_duplicates=allow_duplicates,
@@ -1182,9 +1129,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
     }
 
     val1 = common.structparse_pop_objlist_to_dict(
-        {"foo": [0, 1, 2]},
-        "path",
-        "foo",
+        _pargs([0, 1, 2]),
         construct=lambda yamlidx2, yamlpath2, arg: common.StructParseBaseNamed(
             yamlpath=yamlpath2,
             yamlidx=yamlidx2,
@@ -1200,9 +1145,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
     }
 
     val2 = common.structparse_pop_objlist_to_dict(
-        {"foo": [0, 1, 2]},
-        "path",
-        "foo",
+        _pargs([0, 1, 2]),
         construct=lambda yamlidx2, yamlpath2, arg: str(arg),
         get_key=lambda x: x,
     )
@@ -1211,9 +1154,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
 
     with pytest.raises(RuntimeError):
         common.structparse_pop_objlist_to_dict(  # type: ignore
-            {"foo": [0, 1, 2]},
-            "path",
-            "foo",
+            _pargs([0, 1, 2]),
             construct=lambda yamlidx2, yamlpath2, arg: str(arg),
         )
 
