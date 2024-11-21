@@ -19,6 +19,7 @@ from ktoolbox.common import enum_convert
 from ktoolbox.common import enum_convert_list
 from ktoolbox.common import serialize_enum
 from ktoolbox.common import StructParsePopContext
+from ktoolbox.common import StructParseParseContext
 
 
 class ReachedError(Exception):
@@ -647,7 +648,6 @@ def _pargs(
 
 
 def test_structparse_with() -> None:
-
     with common.structparse_with_strdict({}, "path") as pargs:
         with pytest.raises(ValueError):
             v1 = common.structparse_pop_str(pargs.for_key("v1"))
@@ -681,6 +681,10 @@ def test_structparse_with() -> None:
         if sys.version_info >= (3, 10):
             typing.assert_type(v4, Optional[TstTestType])
         assert v4 is None
+
+    pctx = StructParseParseContext({"foo": "a"}, yamlpath="path")
+    with pctx.with_strdict() as pargs:
+        assert common.structparse_pop_str(pargs.for_key("foo")) == "a"
 
 
 def test_structparse_pop_str_1() -> None:
@@ -980,10 +984,10 @@ def test_structparse_pop_enum() -> None:
 
 
 def test_structparse_pop_obj() -> None:
-    def _construct(yamlidx2: int, yamlpath2: str, arg: Any) -> int:
-        if arg is None:
+    def _construct(pctx: StructParseParseContext) -> int:
+        if pctx.arg is None:
             return -1
-        return int(arg)
+        return int(pctx.arg)
 
     v1 = common.structparse_pop_obj(
         _pargs("4"),
@@ -1096,7 +1100,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
     ) -> dict[int, tuple[int, str, int]]:
         val0 = common.structparse_pop_objlist_to_dict(
             _pargs(vdict=vdict, key=key),
-            construct=lambda yamlidx2, yamlpath2, arg: (yamlidx2, yamlpath2, int(arg)),
+            construct=lambda pctx: (pctx.yamlidx, pctx.yamlpath, int(pctx.arg)),
             get_key=lambda v: int(v[2]),
             allow_duplicates=allow_duplicates,
         )
@@ -1130,10 +1134,10 @@ def test_structparse_pop_objlist_as_dict() -> None:
 
     val1 = common.structparse_pop_objlist_to_dict(
         _pargs([0, 1, 2]),
-        construct=lambda yamlidx2, yamlpath2, arg: common.StructParseBaseNamed(
-            yamlpath=yamlpath2,
-            yamlidx=yamlidx2,
-            name=str(arg),
+        construct=lambda pctx: common.StructParseBaseNamed(
+            yamlpath=pctx.yamlpath,
+            yamlidx=pctx.yamlidx,
+            name=str(pctx.arg),
         ),
     )
     if sys.version_info >= (3, 10):
@@ -1146,7 +1150,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
 
     val2 = common.structparse_pop_objlist_to_dict(
         _pargs([0, 1, 2]),
-        construct=lambda yamlidx2, yamlpath2, arg: str(arg),
+        construct=lambda pctx: str(pctx.arg),
         get_key=lambda x: x,
     )
     if sys.version_info >= (3, 10):
@@ -1155,7 +1159,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
     with pytest.raises(RuntimeError):
         common.structparse_pop_objlist_to_dict(  # type: ignore
             _pargs([0, 1, 2]),
-            construct=lambda yamlidx2, yamlpath2, arg: str(arg),
+            construct=lambda pctx: str(pctx.arg),
         )
 
 

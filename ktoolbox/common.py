@@ -769,6 +769,61 @@ def _yamlpath_value_error(
 
 
 @dataclass(frozen=True)
+class StructParseParseContext:
+    arg: Any
+    yamlpath: str = dataclasses.field(default="")
+    yamlidx: int = dataclasses.field(default=0)
+
+    @contextlib.contextmanager
+    def with_strdict(self) -> typing.Generator["StructParseVarg", None, None]:
+        return _structparse_with_strdict(self.arg, self.yamlpath)
+
+    @staticmethod
+    def enumerate_list(
+        yamlpath: str,
+        arg: Iterable[Any],
+    ) -> list["StructParseParseContext"]:
+        return [
+            StructParseParseContext(
+                arg2,
+                yamlpath=f"{yamlpath}[{yamlidx2}]",
+                yamlidx=yamlidx2,
+            )
+            for yamlidx2, arg2 in enumerate(arg)
+        ]
+
+    def build_yamlpath(
+        self,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> str:
+        return yamlpath_build(
+            self.yamlpath,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+    def value_error(
+        self,
+        msg: str,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> ValueError:
+        return _yamlpath_value_error(
+            self.yamlpath,
+            msg,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+
+@dataclass(frozen=True)
 class StructParsePopContext:
     vdict: dict[str, Any]
     base_yamlpath: str
@@ -918,6 +973,13 @@ def structparse_with_strdict(
         foo = structparse_pop_int(vdict, yamlpath, "foo", default=None)
         structparse_check_empty_dict(vdict)
     """
+    return _structparse_with_strdict(arg, yamlpath)
+
+
+def _structparse_with_strdict(
+    arg: Any,
+    yamlpath: str,
+) -> typing.Generator[StructParseVarg, None, None]:
     vdict = structparse_check_strdict(arg, yamlpath)
     varg = StructParseVarg(vdict, yamlpath)
     yield varg
@@ -1125,7 +1187,7 @@ def structparse_pop_list(
 def structparse_pop_obj(
     pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     default: Union[T2, _MISSING_TYPE] = MISSING,
     construct_default: bool = False,
 ) -> Union[T, T2]:
@@ -1144,13 +1206,14 @@ def structparse_pop_obj(
             raise pargs.value_error("mandatory key missing")
         return default
 
-    return construct(0, pargs.yamlpath, v)
+    pctx = StructParseParseContext(v, pargs.yamlpath)
+    return construct(pctx)
 
 
 def structparse_pop_objlist(
     pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     allow_missing: Optional[bool] = None,
     allow_empty: bool = True,
 ) -> tuple[T, ...]:
@@ -1159,21 +1222,16 @@ def structparse_pop_objlist(
         allow_missing=allow_missing,
         allow_empty=allow_empty,
     )
-    return tuple(
-        construct(
-            yamlidx2,
-            pargs.build_yamlpath(yamlidx=yamlidx2),
-            arg2,
-        )
-        for yamlidx2, arg2 in enumerate(v)
-    )
+
+    pctxes = StructParseParseContext.enumerate_list(pargs.yamlpath, v)
+    return tuple(construct(pctx) for pctx in pctxes)
 
 
 @typing.overload
 def structparse_pop_objlist_to_dict(
     pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], TStructParseBaseNamed],
+    construct: typing.Callable[[StructParseParseContext], TStructParseBaseNamed],
     get_key: Literal[None] = None,
     allow_empty: bool = True,
     allow_duplicates: bool = False,
@@ -1185,7 +1243,7 @@ def structparse_pop_objlist_to_dict(
 def structparse_pop_objlist_to_dict(
     pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     get_key: typing.Callable[[T], T2],
     allow_empty: bool = True,
     allow_duplicates: bool = False,
@@ -1196,7 +1254,7 @@ def structparse_pop_objlist_to_dict(
 def structparse_pop_objlist_to_dict(
     pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     get_key: Optional[typing.Callable[[T], T2]] = None,
     allow_empty: bool = True,
     allow_duplicates: bool = False,
