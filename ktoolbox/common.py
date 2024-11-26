@@ -625,6 +625,17 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
     return cast(T, cls(**create_kwargs))
 
 
+def dataclass_from_json(cls: type[T], jsondata: str) -> T:
+    data = json.loads(jsondata)
+    return dataclass_from_dict(cls, data)
+
+
+def dataclass_from_file(cls: type[T], filename: Union[str, pathlib.Path]) -> T:
+    with open(filename) as f:
+        data = json.load(f)
+    return dataclass_from_dict(cls, data)
+
+
 def check_type(
     value: typing.Any,
     type_hint: typing.Any,
