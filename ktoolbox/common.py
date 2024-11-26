@@ -303,7 +303,10 @@ def path_norm(
         if part == "" or part == ".":
             trailing_slash = True
             continue
-        trailing_slash = False
+        if part == "..":
+            trailing_slash = True
+        else:
+            trailing_slash = False
         parts.append(part)
 
     if not parts:

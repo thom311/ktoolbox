@@ -1246,6 +1246,8 @@ def test_path_norm() -> None:
         Conf("/tmp/.", "/tmp/", normpath="/tmp"),
         Conf("/tmp/.", "/tmp", preserve_dir=False),
         Conf("/tmp/", "/tmp", preserve_dir=False),
+        Conf("/tmp/..", "/tmp/..", normpath="/", preserve_dir=False),
+        Conf("/tmp/..", "/tmp/../", normpath="/", preserve_dir=True),
     ]
     for conf in confs:
         r1 = common.path_norm(
