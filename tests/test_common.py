@@ -411,6 +411,19 @@ def test_dataclass_tofrom_dict() -> None:
     assert type(c10.x) is int
     assert type(C10(1.0).x) is float
 
+    @common.strict_dataclass
+    @dataclasses.dataclass
+    class C11:
+        lst: tuple[C10, ...]
+
+    c11 = C11(lst=(c10,))
+
+    assert common.dataclass_to_dict(c11) == {"lst": ({"x": 1},)}
+    assert common.dataclass_to_json(c11) == '{"lst": [{"x": 1}]}'
+    assert common.dataclass_from_dict(C11, {"lst": [{"x": 1}]}) == c11
+    assert common.dataclass_from_dict(C11, {"lst": ({"x": 1},)}) == c11
+    assert common.dataclass_from_dict(C11, json.loads('{"lst": [{"x": 1}]}')) == c11
+
 
 def test_iter_get_first() -> None:
 

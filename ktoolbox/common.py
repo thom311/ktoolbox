@@ -606,8 +606,13 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
                 converted = True
         elif actual_type is list:
             args = typing.get_args(field.type)
-            if isinstance(value, list) and len(args) == 1:
+            if isinstance(value, (list, tuple)) and len(args) == 1:
                 value_converted = [convert_simple(args[0], v) for v in value]
+                converted = True
+        elif actual_type is tuple:
+            args = typing.get_args(field.type)
+            if isinstance(value, (list, tuple)) and len(args) == 2 and args[1] is ...:
+                value_converted = tuple(convert_simple(args[0], v) for v in value)
                 converted = True
 
         if not converted:
