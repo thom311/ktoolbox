@@ -736,6 +736,183 @@ def strict_dataclass(cls: TCallable) -> TCallable:
     return cls
 
 
+def yamlpath_build(
+    yamlpath: str,
+    yamlidx: Optional[int] = None,
+    key: Optional[str] = None,
+    subpath: Optional[str] = None,
+) -> str:
+    if yamlidx is not None:
+        yamlpath += f"[{yamlidx}]"
+    if key is not None:
+        yamlpath += f".{key}"
+    if subpath is not None:
+        yamlpath += subpath
+    return yamlpath
+
+
+def _yamlpath_value_error(
+    yamlpath: str,
+    msg: str,
+    *,
+    yamlidx: Optional[int] = None,
+    key: Optional[str] = None,
+    subpath: Optional[str] = None,
+) -> ValueError:
+    yamlpath = yamlpath_build(
+        yamlpath,
+        yamlidx=yamlidx,
+        key=key,
+        subpath=subpath,
+    )
+    return ValueError(f'"{yamlpath}": {msg}')
+
+
+@dataclass(frozen=True)
+class StructParseParseContext:
+    arg: Any
+    yamlpath: str = dataclasses.field(default="")
+    yamlidx: int = dataclasses.field(default=0)
+
+    @contextlib.contextmanager
+    def with_strdict(self) -> typing.Generator["StructParseVarg", None, None]:
+        return _structparse_with_strdict(self.arg, self.yamlpath)
+
+    @staticmethod
+    def enumerate_list(
+        yamlpath: str,
+        arg: Iterable[Any],
+    ) -> list["StructParseParseContext"]:
+        return [
+            StructParseParseContext(
+                arg2,
+                yamlpath=f"{yamlpath}[{yamlidx2}]",
+                yamlidx=yamlidx2,
+            )
+            for yamlidx2, arg2 in enumerate(arg)
+        ]
+
+    def build_yamlpath(
+        self,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> str:
+        return yamlpath_build(
+            self.yamlpath,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+    def value_error(
+        self,
+        msg: str,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> ValueError:
+        return _yamlpath_value_error(
+            self.yamlpath,
+            msg,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+
+@dataclass(frozen=True)
+class StructParsePopContext:
+    vdict: dict[str, Any]
+    base_yamlpath: str
+    key: str
+
+    @staticmethod
+    def for_name(
+        vdict: dict[str, Any],
+        yamlpath: str,
+        key: str = "name",
+    ) -> "StructParsePopContext":
+        return StructParsePopContext(vdict, yamlpath, key)
+
+    def pop_value(self) -> Optional[Any]:
+        return self.vdict.pop(self.key, None)
+
+    @property
+    def yamlpath(self) -> str:
+        return yamlpath_build(self.base_yamlpath, key=self.key)
+
+    def build_yamlpath(
+        self,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> str:
+        return yamlpath_build(
+            self.yamlpath,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+    def value_error(
+        self,
+        msg: str,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> ValueError:
+        return _yamlpath_value_error(
+            self.yamlpath,
+            msg,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+
+@dataclass(frozen=True)
+class StructParseVarg:
+    vdict: dict[str, Any]
+    yamlpath: str
+    check_empty: bool = dataclasses.field(default=True, init=False)
+
+    def for_key(self, key: str) -> StructParsePopContext:
+        """
+        Returns a StructParsePopContext that contains [vdict, yamlpath, key].
+
+        The structparse_pop_*() functions have a StructParsePopContext argument
+        with the parameters of what they parse.
+
+        Example:
+
+           foo = structparse_pop_str(varg.for_key("foo"))
+        """
+        return StructParsePopContext(self.vdict, self.yamlpath, key)
+
+    def for_name(self, key: str = "name") -> StructParsePopContext:
+        return self.for_key(key)
+        """
+        Same as for_key(), but defaults to a key "name".
+
+        Example:
+
+           foo = structparse_pop_str_name(varg.for_name())
+        """
+        return StructParsePopContext(self.vdict, self.yamlpath, key)
+
+    def skip_check_empty(self) -> None:
+        """
+        With structparse_with_strdict(), indicate that the final
+        structparse_check_empty_dict() should be skipped.
+        """
+        object.__setattr__(self, "check_empty", False)
+
+
 def structparse_check_strdict(arg: Any, yamlpath: str) -> dict[str, Any]:
     """
     Checks that "args" is a strdict and returns a shallow copy
@@ -772,45 +949,6 @@ def structparse_check_empty_dict(vdict: dict[str, Any], yamlpath: str) -> None:
         raise ValueError(f'"{yamlpath}": unknown keys {list(vdict)}')
 
 
-@dataclass(frozen=True)
-class StructParseVarg:
-    vdict: dict[str, Any]
-    yamlpath: str
-    check_empty: bool = dataclasses.field(default=True, init=False)
-
-    def for_key(self, key: str) -> tuple[dict[str, Any], str, str]:
-        """
-        Returns a tuple of [vdict, yamlpath, key].
-
-        This is for convenience, to pass to the structparse_pop_*() functions
-        with less redundant typing. In particular, when wrapping lines, this
-        only expands to one line instead of three, making it more compact to
-        read.
-
-        Example:
-
-           foo = structparse_pop_str(*varg.for_key("foo"))
-        """
-        return self.vdict, self.yamlpath, key
-
-    def for_name(self, key: str = "name") -> tuple[dict[str, Any], str, str]:
-        """
-        Same as for_key(), but defaults to a key "name".
-
-        Example:
-
-           foo = structparse_pop_str_name(*varg.for_name())
-        """
-        return self.vdict, self.yamlpath, key
-
-    def skip_check_empty(self) -> None:
-        """
-        With structparse_with_strdict(), indicate that the final
-        structparse_check_empty_dict() should be skipped.
-        """
-        object.__setattr__(self, "check_empty", False)
-
-
 @contextlib.contextmanager
 def structparse_with_strdict(
     arg: Any,
@@ -825,8 +963,8 @@ def structparse_with_strdict(
     Example:
 
         with structparse_with_strdict(arg, yamlpath) as varg:
-            name = structparse_pop_str_name(*varg.for_name())
-            foo = structparse_pop_int(*varg.for_key("foo"), default=None)
+            name = structparse_pop_str_name(varg.for_name())
+            foo = structparse_pop_int(varg.for_key("foo"), default=None)
 
     Above is basically the same as
 
@@ -835,6 +973,13 @@ def structparse_with_strdict(
         foo = structparse_pop_int(vdict, yamlpath, "foo", default=None)
         structparse_check_empty_dict(vdict)
     """
+    return _structparse_with_strdict(arg, yamlpath)
+
+
+def _structparse_with_strdict(
+    arg: Any,
+    yamlpath: str,
+) -> typing.Generator[StructParseVarg, None, None]:
     vdict = structparse_check_strdict(arg, yamlpath)
     varg = StructParseVarg(vdict, yamlpath)
     yield varg
@@ -843,9 +988,7 @@ def structparse_with_strdict(
 
 
 def structparse_pop_str(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     default: Union[TOptionalStr, _MISSING_TYPE] = MISSING,
     empty_as_default: Optional[bool] = None,
@@ -876,118 +1019,100 @@ def structparse_pop_str(
     if not allow_empty:
         empty_as_default = False
 
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     if v is not None and not isinstance(v, str):
-        raise ValueError(f'"{yamlpath}.{key}": expects a string but got {v}')
+        raise pargs.value_error(f"expects a string but got {repr(v)}")
     if v is None or (not v and empty_as_default):
         if isinstance(default, _MISSING_TYPE):
-            raise ValueError(f'"{yamlpath}.{key}": mandatory key missing')
+            raise pargs.value_error("mandatory key missing")
         return default
     if not v:
         if not allow_empty:
-            raise ValueError(f'"{yamlpath}.{key}": cannot be an empty string')
+            raise pargs.value_error("cannot be an empty string")
     if check is not None:
         if not check(v):
-            raise ValueError(f'"{yamlpath}.{key}": invalid string')
+            raise pargs.value_error("invalid string")
     return typing.cast(TOptionalStr, v)
 
 
 def structparse_pop_str_name(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str = "name",
+    pargs: StructParsePopContext,
     *,
     default: Union[TOptionalStr, _MISSING_TYPE] = MISSING,
 ) -> Union[str, TOptionalStr]:
     return structparse_pop_str(
-        vdict,
-        yamlpath,
-        key=key,
+        pargs,
         default=default,
         allow_empty=False,
     )
 
 
 def structparse_pop_int(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     default: Union[TOptionalInt, _MISSING_TYPE] = MISSING,
     check: Optional[typing.Callable[[int], bool]] = None,
     description: str = "a number",
 ) -> Union[int, TOptionalInt]:
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     if v is None:
         if isinstance(default, _MISSING_TYPE):
-            raise ValueError(
-                f'"{yamlpath}.{key}": requires {description}',
-            )
+            raise pargs.value_error(f"requires {description}")
         return default
     try:
         val = int(v)
     except Exception:
-        raise ValueError(f'"{yamlpath}.{key}": expects {description} but got {repr(v)}')
+        raise pargs.value_error(f"expects {description} but got {repr(v)}")
     if check is not None:
         if not check(val):
-            raise ValueError(
-                f'"{yamlpath}.{key}": expects {description} but got {repr(v)}'
-            )
+            raise pargs.value_error(f"expects {description} but got {repr(v)}")
     return val
 
 
 def structparse_pop_float(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     default: Union[TOptionalFloat, _MISSING_TYPE] = MISSING,
     check: Optional[typing.Callable[[float], bool]] = None,
     description: str = "a floating point number",
 ) -> Union[float, TOptionalFloat]:
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     if v is None:
         if isinstance(default, _MISSING_TYPE):
-            raise ValueError(
-                f'"{yamlpath}.{key}": requires {description}',
+            raise pargs.value_error(
+                f"requires {description}",
             )
         return default
     try:
         val = float(v)
     except Exception:
-        raise ValueError(f'"{yamlpath}.{key}": expects {description} but got {repr(v)}')
+        raise pargs.value_error(f"expects {description} but got {repr(v)}")
     if check is not None:
         if not check(val):
-            raise ValueError(
-                f'"{yamlpath}.{key}": expects {description} but got {repr(v)}'
-            )
+            raise pargs.value_error(f"expects {description} but got {repr(v)}")
     return val
 
 
 def structparse_pop_bool(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     default: Union[TOptionalBool, _MISSING_TYPE] = MISSING,
     description: str = "a boolean",
 ) -> Union[bool, TOptionalBool]:
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     try:
         # Just like str_to_bool(), we accept "", "default", and "-1" as default
         # values (if `default` is not MISSING).
         return str_to_bool(v, on_default=default)
     except Exception:
         if v is None:
-            raise ValueError(f'"{yamlpath}.{key}": requires {description}')
-        raise ValueError(f'"{yamlpath}.{key}": expects {description} but got {repr(v)}')
+            raise pargs.value_error(f"requires {description}")
+        raise pargs.value_error(f"expects {description} but got {repr(v)}")
 
 
 @typing.overload
 def structparse_pop_enum(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     enum_type: type[E],
     default: Union[E, _MISSING_TYPE] = MISSING,
@@ -997,9 +1122,7 @@ def structparse_pop_enum(
 
 @typing.overload
 def structparse_pop_enum(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     enum_type: type[E],
     default: Literal[None],
@@ -1008,18 +1131,16 @@ def structparse_pop_enum(
 
 
 def structparse_pop_enum(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     enum_type: type[E],
     default: Union[Optional[E], _MISSING_TYPE] = MISSING,
 ) -> Optional[E]:
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     if v is None:
         if isinstance(default, _MISSING_TYPE):
-            raise ValueError(
-                f"\"{yamlpath}.{key}\": requires one of {', '.join(e.name for e in enum_type)}"
+            raise pargs.value_error(
+                f"requires one of {', '.join(e.name for e in enum_type)}"
             )
         return default
     if isinstance(default, _MISSING_TYPE):
@@ -1027,15 +1148,13 @@ def structparse_pop_enum(
     try:
         return enum_convert(enum_type, v, default=default)
     except Exception:
-        raise ValueError(
-            f"\"{yamlpath}.{key}\": requires one of {', '.join(e.name for e in enum_type)} but got {repr(v)}"
+        raise pargs.value_error(
+            f"requires one of {', '.join(e.name for e in enum_type)} but got {repr(v)}"
         )
 
 
 def structparse_pop_list(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
     allow_missing: Optional[bool] = None,
     allow_empty: bool = True,
@@ -1048,29 +1167,27 @@ def structparse_pop_list(
     """
     if allow_missing is None:
         allow_missing = allow_empty
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     if v is None:
         if not allow_missing:
-            raise ValueError(f'"{yamlpath}.{key}": mandatory list argument missing')
+            raise pargs.value_error("mandatory list argument missing")
         # We never return None here. For many callers that is what we just
         # want. For callers that want to do something specific if the key is
         # unset, they should check first whether vdict contains the key.
         return []
     if not isinstance(v, list):
-        raise ValueError(f'"{yamlpath}.{key}": requires a list but got {type(v)}')
+        raise pargs.value_error(f"requires a list but got {type(v)}")
     if not v:
         if not allow_empty:
-            raise ValueError(f'"{yamlpath}.{key}": list cannot be empty')
+            raise pargs.value_error("list cannot be empty")
     # Return a shallow copy of the list.
     return list(v)
 
 
 def structparse_pop_obj(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     default: Union[T2, _MISSING_TYPE] = MISSING,
     construct_default: bool = False,
 ) -> Union[T, T2]:
@@ -1083,47 +1200,38 @@ def structparse_pop_obj(
     the callback a default value. Otherwise, if "default" is set, that
     is returned for missing keys.
     """
-    v = vdict.pop(key, None)
+    v = pargs.pop_value()
     if not construct_default and v is None:
         if isinstance(default, _MISSING_TYPE):
-            raise ValueError(f'"{yamlpath}.{key}": mandatory key missing')
+            raise pargs.value_error("mandatory key missing")
         return default
-    return construct(0, f"{yamlpath}.{key}", v)
+
+    pctx = StructParseParseContext(v, pargs.yamlpath)
+    return construct(pctx)
 
 
 def structparse_pop_objlist(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     allow_missing: Optional[bool] = None,
     allow_empty: bool = True,
 ) -> tuple[T, ...]:
     v = structparse_pop_list(
-        vdict,
-        yamlpath,
-        key,
+        pargs,
         allow_missing=allow_missing,
         allow_empty=allow_empty,
     )
-    return tuple(
-        construct(
-            yamlidx2,
-            f"{yamlpath}.{key}[{yamlidx2}]",
-            arg2,
-        )
-        for yamlidx2, arg2 in enumerate(v)
-    )
+
+    pctxes = StructParseParseContext.enumerate_list(pargs.yamlpath, v)
+    return tuple(construct(pctx) for pctx in pctxes)
 
 
 @typing.overload
 def structparse_pop_objlist_to_dict(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], TStructParseBaseNamed],
+    construct: typing.Callable[[StructParseParseContext], TStructParseBaseNamed],
     get_key: Literal[None] = None,
     allow_empty: bool = True,
     allow_duplicates: bool = False,
@@ -1133,11 +1241,9 @@ def structparse_pop_objlist_to_dict(
 
 @typing.overload
 def structparse_pop_objlist_to_dict(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     get_key: typing.Callable[[T], T2],
     allow_empty: bool = True,
     allow_duplicates: bool = False,
@@ -1146,19 +1252,15 @@ def structparse_pop_objlist_to_dict(
 
 
 def structparse_pop_objlist_to_dict(
-    vdict: dict[str, Any],
-    yamlpath: str,
-    key: str,
+    pargs: StructParsePopContext,
     *,
-    construct: typing.Callable[[int, str, Any], T],
+    construct: typing.Callable[[StructParseParseContext], T],
     get_key: Optional[typing.Callable[[T], T2]] = None,
     allow_empty: bool = True,
     allow_duplicates: bool = False,
 ) -> dict[T2, T]:
     lst = structparse_pop_objlist(
-        vdict,
-        yamlpath,
-        key,
+        pargs,
         construct=construct,
         allow_empty=allow_empty,
     )
@@ -1184,8 +1286,9 @@ def structparse_pop_objlist_to_dict(
                     key_name = item_key.name
                 else:
                     key_name = repr(item_key)
-                raise ValueError(
-                    f'"{yamlpath}.{key}[{yamlidx2}]": duplicate key {repr(key_name)} with "{yamlpath}.{key}[{item2[0]}]"'
+                raise pargs.value_error(
+                    f'duplicate key {repr(key_name)} with "{pargs.build_yamlpath(yamlidx=item2[0])}"',
+                    yamlidx=yamlidx2,
                 )
         result[item_key] = (yamlidx2, item)
     return {k: v[1] for k, v in result.items()}
