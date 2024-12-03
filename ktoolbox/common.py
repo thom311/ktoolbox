@@ -751,7 +751,7 @@ def yamlpath_build(
     return yamlpath
 
 
-def _yamlpath_value_error(
+def yamlpath_value_error(
     yamlpath: str,
     msg: str,
     *,
@@ -814,7 +814,7 @@ class StructParseParseContext:
         key: Optional[str] = None,
         subpath: Optional[str] = None,
     ) -> ValueError:
-        return _yamlpath_value_error(
+        return yamlpath_value_error(
             self.yamlpath,
             msg,
             yamlidx=yamlidx,
@@ -866,7 +866,7 @@ class StructParsePopContext:
         key: Optional[str] = None,
         subpath: Optional[str] = None,
     ) -> ValueError:
-        return _yamlpath_value_error(
+        return yamlpath_value_error(
             self.yamlpath,
             msg,
             yamlidx=yamlidx,
