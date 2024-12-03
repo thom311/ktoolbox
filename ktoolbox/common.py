@@ -1347,6 +1347,36 @@ class StructParseBase(abc.ABC):
     def serialize_json(self) -> str:
         return json.dumps(self.serialize())
 
+    def build_yamlpath(
+        self,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> str:
+        return yamlpath_build(
+            self.yamlpath,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
+    def value_error(
+        self,
+        msg: str,
+        *,
+        yamlidx: Optional[int] = None,
+        key: Optional[str] = None,
+        subpath: Optional[str] = None,
+    ) -> ValueError:
+        return yamlpath_value_error(
+            self.yamlpath,
+            msg,
+            yamlidx=yamlidx,
+            key=key,
+            subpath=subpath,
+        )
+
 
 @strict_dataclass
 @dataclass(frozen=True, **KW_ONLY_DATACLASS)
