@@ -1319,3 +1319,10 @@ def test_iter_listify() -> None:
 
     f_dict_2_x: typing.Callable[[int, str, str], dict[int, str]] = f_dict_2
     assert f_dict_2_x is f_dict_2
+
+
+def test_iter_eval_now() -> None:
+    lst1 = common.iter_eval_now(x for x in range(5))
+    assert lst1 == (0, 1, 2, 3, 4)
+    assert len(lst1) == 5
+    assert lst1[3] == 3

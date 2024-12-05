@@ -15,6 +15,7 @@ import weakref
 
 from collections.abc import Iterable
 from collections.abc import Mapping
+from collections.abc import Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass
 from dataclasses import fields
@@ -231,6 +232,12 @@ def iter_filter_none(lst: Iterable[Optional[T]]) -> Iterable[T]:
     for v in lst:
         if v is not None:
             yield v
+
+
+def iter_eval_now(lst: Iterable[T]) -> Sequence[T]:
+    if isinstance(lst, (list, tuple)):
+        return lst
+    return tuple(lst)
 
 
 if sys.version_info >= (3, 10):
