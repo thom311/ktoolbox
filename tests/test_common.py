@@ -121,7 +121,7 @@ def test_str_to_bool() -> None:
     with pytest.raises(ValueError):
         common.bool_to_str(False, format="bogus")
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(common.str_to_bool("true"), bool)
         typing.assert_type(common.str_to_bool("true", on_error=None), bool | None)
         typing.assert_type(common.str_to_bool("true", on_default=None), bool | None)
@@ -434,96 +434,96 @@ def test_iter_get_first() -> None:
 
     lst = []
     v2a = common.iter_get_first(lst)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v2a, Optional[int])
     assert v2a is None
 
     lst = [123]
     v2b = common.iter_get_first(lst)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v2b, Optional[int])
     assert v2b == 123
 
     lst = [12, 13]
     v2c = common.iter_get_first(lst)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v2c, Optional[int])
     assert v2c == 12
 
     lst = []
     v3a = common.iter_get_first(lst, unique=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v3a, Optional[int])
     assert v3a is None
 
     lst = [123]
     v3b = common.iter_get_first(lst, unique=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v3b, Optional[int])
     assert v3b == 123
 
     lst = [12, 13]
     v3c = common.iter_get_first(lst, unique=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v3c, Optional[int])
     assert v3c is None
 
     lst = []
     v5a = common.iter_get_first(lst, force_unique=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v5a, Optional[int])
     assert v5a is None
 
     lst = [123]
     v5b = common.iter_get_first(lst, force_unique=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v5b, Optional[int])
     assert v5b == 123
 
     with pytest.raises(ValueError):
         lst = [12, 13]
         v5c = common.iter_get_first(lst, force_unique=True)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v5c, Optional[int])
         assert False
 
     with pytest.raises(ValueError):
         lst = []
         v1a = common.iter_get_first(lst, unique=True, force_unique=True)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v1a, int)
         assert False
 
     lst = [101]
     v1b = common.iter_get_first(lst, unique=True, force_unique=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v1b, int)
     assert v1b == 101
 
     with pytest.raises(ValueError):
         lst = [102, 103]
         v1c = common.iter_get_first(lst, unique=True, force_unique=True)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v1c, int)
         assert False
 
     with pytest.raises(ValueError):
         lst = []
         v6a = common.iter_get_first(lst, single=True)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v6a, int)
         assert False
 
     lst = [101]
     v6b = common.iter_get_first(lst, single=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v6b, int)
     assert v6b == 101
 
     with pytest.raises(ValueError):
         lst = [102, 103]
         v6c = common.iter_get_first(lst, single=True)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v6c, int)
         assert False
 
@@ -652,16 +652,16 @@ def test_structparse_with() -> None:
     with common.structparse_with_strdict({}, "path") as pargs:
         with pytest.raises(ValueError):
             v1 = common.structparse_pop_str(pargs.for_key("v1"))
-            if sys.version_info >= (3, 10):
+            if sys.version_info >= (3, 11):
                 typing.assert_type(v1, str)
 
         v22 = common.structparse_pop_list(_pargs())
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v22, list[Any])
         assert v22 == []
 
         v33n = common.structparse_pop_list(pargs.for_key("v33n"))
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v33n, list[Any])
         assert v33n == []
 
@@ -670,7 +670,7 @@ def test_structparse_with() -> None:
             enum_type=TstTestType,
             default=TstTestType.IPERF_TCP,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v3, TstTestType)
         assert v3 == TstTestType.IPERF_TCP
 
@@ -679,7 +679,7 @@ def test_structparse_with() -> None:
             enum_type=TstTestType,
             default=None,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v4, Optional[TstTestType])
         assert v4 is None
 
@@ -691,14 +691,14 @@ def test_structparse_with() -> None:
 def test_structparse_pop_str_1() -> None:
     with pytest.raises(ValueError):
         val0 = common.structparse_pop_str(_pargs())
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0, str)
 
     val1 = common.structparse_pop_str(
         _pargs(),
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val1, Optional[str])
     assert val1 is None
 
@@ -706,14 +706,14 @@ def test_structparse_pop_str_1() -> None:
         _pargs(),
         default="defval",
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val2, str)
     assert val2 == "defval"
 
     val3 = common.structparse_pop_str(
         _pargs("strval"),
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val3, str)
     assert val3 == "strval"
 
@@ -721,7 +721,7 @@ def test_structparse_pop_str_1() -> None:
         _pargs("strval"),
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val4, Optional[str])
     assert val4 == "strval"
 
@@ -729,7 +729,7 @@ def test_structparse_pop_str_1() -> None:
         _pargs("strval"),
         default="defval",
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val5, str)
     assert val5 == "strval"
 
@@ -853,7 +853,7 @@ def test_structparse_pop_bool() -> None:
             val0c = common.structparse_pop_bool(
                 _pargs(test_val),
             )
-            if sys.version_info >= (3, 10):
+            if sys.version_info >= (3, 11):
                 typing.assert_type(val0c, bool)
 
     with pytest.raises(ValueError):
@@ -861,7 +861,7 @@ def test_structparse_pop_bool() -> None:
             _pargs("bogus"),
             default=False,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0a, bool)
 
     with pytest.raises(ValueError):
@@ -869,7 +869,7 @@ def test_structparse_pop_bool() -> None:
             _pargs("bogus"),
             default=None,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0b, Optional[bool])
 
     for test_val in (None, "", "default", "-1"):
@@ -877,7 +877,7 @@ def test_structparse_pop_bool() -> None:
             _pargs(test_val),
             default=False,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0d, bool)
         assert val0d is False
 
@@ -886,7 +886,7 @@ def test_structparse_pop_bool() -> None:
             _pargs(test_val),
             default=None,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0e, Optional[bool])
         assert val0e is None
 
@@ -894,7 +894,7 @@ def test_structparse_pop_bool() -> None:
         _pargs(),
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val1, Optional[bool])
     assert val1 is None
 
@@ -902,14 +902,14 @@ def test_structparse_pop_bool() -> None:
         _pargs(),
         default=False,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val2, bool)
     assert val2 is False
 
     val3 = common.structparse_pop_bool(
         _pargs("true"),
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val3, bool)
     assert val3 is True
 
@@ -917,7 +917,7 @@ def test_structparse_pop_bool() -> None:
         _pargs("1"),
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val4, Optional[bool])
     assert val4 is True
 
@@ -925,7 +925,7 @@ def test_structparse_pop_bool() -> None:
         _pargs("yes"),
         default=False,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val5, bool)
     assert val5 is True
 
@@ -936,7 +936,7 @@ def test_structparse_pop_enum() -> None:
             _pargs(),
             enum_type=TstTestType,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0, TstTestType)
 
     val1 = common.structparse_pop_enum(
@@ -944,7 +944,7 @@ def test_structparse_pop_enum() -> None:
         enum_type=TstTestType,
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val1, Optional[TstTestType])
     assert val1 is None
 
@@ -953,7 +953,7 @@ def test_structparse_pop_enum() -> None:
         enum_type=TstTestType,
         default=TstTestType.IPERF_TCP,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val2, TstTestType)
     assert val2 == TstTestType.IPERF_TCP
 
@@ -961,7 +961,7 @@ def test_structparse_pop_enum() -> None:
         _pargs("http"),
         enum_type=TstTestType,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val3, TstTestType)
     assert val3 == TstTestType.HTTP
 
@@ -970,7 +970,7 @@ def test_structparse_pop_enum() -> None:
         enum_type=TstTestType,
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val4, Optional[TstTestType])
     assert val4 == TstTestType.HTTP
 
@@ -979,7 +979,7 @@ def test_structparse_pop_enum() -> None:
         enum_type=TstTestType,
         default=TstTestType.IPERF_TCP,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val5, TstTestType)
     assert val5 == TstTestType.HTTP
 
@@ -994,7 +994,7 @@ def test_structparse_pop_obj() -> None:
         _pargs("4"),
         construct=_construct,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v1, int)
     assert v1 == 4
 
@@ -1003,7 +1003,7 @@ def test_structparse_pop_obj() -> None:
             _pargs(None),
             construct=_construct,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(v2, int)
         assert False
 
@@ -1012,7 +1012,7 @@ def test_structparse_pop_obj() -> None:
         construct=_construct,
         default=None,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v3, Optional[int])
     assert v3 is None
 
@@ -1021,7 +1021,7 @@ def test_structparse_pop_obj() -> None:
         construct=_construct,
         default=99,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v4, int)
     assert v4 == 99
 
@@ -1030,7 +1030,7 @@ def test_structparse_pop_obj() -> None:
         construct=_construct,
         default="99",
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v5, Union[int, str])
     assert v5 == "99"
 
@@ -1039,46 +1039,46 @@ def test_structparse_pop_obj() -> None:
         construct=_construct,
         construct_default=True,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(v6, int)
     assert v6 == -1
 
 
 def test_structparse_pop_list() -> None:
     lst1 = common.structparse_pop_list(_pargs())
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(lst1, list[Any])
     assert lst1 == []
 
     lst2 = common.structparse_pop_list(_pargs())
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(lst2, list[Any])
     assert lst2 == []
 
     with pytest.raises(ValueError):
         lst7 = common.structparse_pop_list(_pargs(), allow_missing=False)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(lst7, list[Any])
         assert False
 
     lst9 = common.structparse_pop_list(_pargs(), allow_missing=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(lst9, list[Any])
     assert lst9 == []
 
     with pytest.raises(ValueError):
         lst17 = common.structparse_pop_list(_pargs(), allow_empty=False)
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(lst17, list[Any])
         assert False
 
     lst19 = common.structparse_pop_list(_pargs(), allow_empty=True)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(lst19, list[Any])
     assert lst19 == []
 
     lst8 = common.structparse_pop_list(_pargs([]), allow_missing=False)
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(lst8, list[Any])
     assert lst8 == []
 
@@ -1087,7 +1087,7 @@ def test_structparse_pop_list() -> None:
         allow_missing=False,
         allow_empty=True,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(lst21, list[Any])
     assert lst21 == []
 
@@ -1105,7 +1105,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
             get_key=lambda v: int(v[2]),
             allow_duplicates=allow_duplicates,
         )
-        if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 11):
             typing.assert_type(val0, dict[int, tuple[int, str, int]])
         return val0
 
@@ -1141,7 +1141,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
             name=str(pctx.arg),
         ),
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val1, dict[str, common.StructParseBaseNamed])
     assert val1 == {
         "0": common.StructParseBaseNamed(yamlidx=0, yamlpath="path.foo[0]", name="0"),
@@ -1154,7 +1154,7 @@ def test_structparse_pop_objlist_as_dict() -> None:
         construct=lambda pctx: str(pctx.arg),
         get_key=lambda x: x,
     )
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(val2, dict[str, str])
 
     with pytest.raises(RuntimeError):
@@ -1245,7 +1245,7 @@ def test_iter_listify() -> None:
         yield 1
         yield 2
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_lst_1(), list[int])
 
     x_lst_1: list[int] = f_lst_1()
@@ -1255,7 +1255,7 @@ def test_iter_listify() -> None:
     def f_lst_2() -> tuple[str, ...]:
         return ("a", "b")
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_lst_2(), list[str])
 
     x_lst_2: list[str] = f_lst_2()
@@ -1265,7 +1265,7 @@ def test_iter_listify() -> None:
     def f_lst_3(*args: tuple[str, int]) -> dict[str, int]:
         return dict(args)
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_lst_3(), list[str])
 
     x_lst_3: list[str] = f_lst_3()
@@ -1278,7 +1278,7 @@ def test_iter_listify() -> None:
     def f_tpl_1() -> Iterable[str]:
         yield "1"
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_tpl_1(), tuple[str, ...])
 
     x_tpl_1: tuple[str, ...] = f_tpl_1()
@@ -1289,7 +1289,7 @@ def test_iter_listify() -> None:
     def f_tpl_2(x: float) -> list[float]:
         return [1.4, 2.0, x]
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_tpl_2(5.0), tuple[float, ...])
 
     x_tpl_2: tuple[float, ...] = f_tpl_2(5.0)
@@ -1299,7 +1299,7 @@ def test_iter_listify() -> None:
     def f_dict_1(a: int, b: str, c: str) -> Iterable[tuple[int, str]]:
         return {a: b + c}.items()
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_dict_1(2, "", "x"), dict[int, str])
 
     x_dict_1: dict[int, str] = f_dict_1(1, "b", "x")
@@ -1311,7 +1311,7 @@ def test_iter_listify() -> None:
         yield a, b
         yield 5, c
 
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 11):
         typing.assert_type(f_dict_2(2, "", "x"), dict[int, str])
 
     x_dict_2: dict[int, str] = f_dict_2(1, "b", "x")
