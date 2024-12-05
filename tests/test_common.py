@@ -1316,3 +1316,6 @@ def test_iter_listify() -> None:
 
     x_dict_2: dict[int, str] = f_dict_2(1, "b", "x")
     assert x_dict_2 == {1: "b", 5: "x"}
+
+    f_dict_2_x: typing.Callable[[int, str, str], dict[int, str]] = f_dict_2
+    assert f_dict_2_x is f_dict_2
