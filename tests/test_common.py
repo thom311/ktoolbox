@@ -7,6 +7,7 @@ import random
 import sys
 import typing
 
+from collections.abc import Iterable
 from enum import Enum
 from typing import Any
 from typing import Optional
@@ -1236,3 +1237,82 @@ def test_path_norm() -> None:
         else:
             assert r2 == conf.normpath
             assert conf.result != conf.normpath
+
+
+def test_iter_listify() -> None:
+    @common.iter_listify
+    def f_lst_1() -> Iterable[int]:
+        yield 1
+        yield 2
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_lst_1(), list[int])
+
+    x_lst_1: list[int] = f_lst_1()
+    assert x_lst_1 == [1, 2]
+
+    @common.iter_listify
+    def f_lst_2() -> tuple[str, ...]:
+        return ("a", "b")
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_lst_2(), list[str])
+
+    x_lst_2: list[str] = f_lst_2()
+    assert x_lst_2 == ["a", "b"]
+
+    @common.iter_listify
+    def f_lst_3(*args: tuple[str, int]) -> dict[str, int]:
+        return dict(args)
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_lst_3(), list[str])
+
+    x_lst_3: list[str] = f_lst_3()
+    assert x_lst_3 == []
+
+    x_lst_3 = f_lst_3(("a", 1), ("b", 2))
+    assert x_lst_3 == ["a", "b"]
+
+    @common.iter_tuplify
+    def f_tpl_1() -> Iterable[str]:
+        yield "1"
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_tpl_1(), tuple[str, ...])
+
+    x_tpl_1: tuple[str, ...] = f_tpl_1()
+    assert x_tpl_1 == ("1",)
+
+    @common.iter_tuplify
+    @common.iter_tuplify
+    def f_tpl_2(x: float) -> list[float]:
+        return [1.4, 2.0, x]
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_tpl_2(5.0), tuple[float, ...])
+
+    x_tpl_2: tuple[float, ...] = f_tpl_2(5.0)
+    assert x_tpl_2 == (1.4, 2.0, 5.0)
+
+    @common.iter_dictify
+    def f_dict_1(a: int, b: str, c: str) -> Iterable[tuple[int, str]]:
+        return {a: b + c}.items()
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_dict_1(2, "", "x"), dict[int, str])
+
+    x_dict_1: dict[int, str] = f_dict_1(1, "b", "x")
+    assert x_dict_1 == {1: "bx"}
+
+    @common.iter_dictify
+    @common.iter_tuplify
+    def f_dict_2(a: int, b: str, c: str) -> Iterable[tuple[int, str]]:
+        yield a, b
+        yield 5, c
+
+    if sys.version_info >= (3, 10):
+        typing.assert_type(f_dict_2(2, "", "x"), dict[int, str])
+
+    x_dict_2: dict[int, str] = f_dict_2(1, "b", "x")
+    assert x_dict_2 == {1: "b", 5: "x"}

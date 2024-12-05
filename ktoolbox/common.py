@@ -233,6 +233,34 @@ def iter_filter_none(lst: Iterable[Optional[T]]) -> Iterable[T]:
             yield v
 
 
+P = typing.ParamSpec("P")
+
+
+def iter_listify(fcn: typing.Callable[P, Iterable[T]]) -> typing.Callable[P, list[T]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> list[T]:
+        return list(fcn(*args, **kwargs))
+
+    return wrapper
+
+
+def iter_tuplify(
+    fcn: typing.Callable[P, Iterable[T]]
+) -> typing.Callable[P, tuple[T, ...]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> tuple[T, ...]:
+        return tuple(fcn(*args, **kwargs))
+
+    return wrapper
+
+
+def iter_dictify(
+    fcn: typing.Callable[P, Iterable[tuple[T1, T2]]]
+) -> typing.Callable[P, dict[T1, T2]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> dict[T1, T2]:
+        return dict(fcn(*args, **kwargs))
+
+    return wrapper
+
+
 def unwrap(val: Optional[T], *, or_else: Optional[T] = None) -> T:
     # Like Rust's unwrap. Get the value or die (with an exception).
     #
