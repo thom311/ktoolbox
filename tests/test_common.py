@@ -1,4 +1,5 @@
 import dataclasses
+import io
 import json
 import os
 import pathlib
@@ -1341,3 +1342,19 @@ def test_iter_eval_now() -> None:
     assert lst1 == (0, 1, 2, 3, 4)
     assert len(lst1) == 5
     assert lst1[3] == 3
+
+
+def test_json_dump() -> None:
+    def _dump(data: Any) -> str:
+        buffer = io.StringIO()
+        common.json_dump(data, buffer)
+        return buffer.getvalue()
+
+    assert _dump(1) == "1\n"
+    assert (
+        _dump({"a": 5.5})
+        == """{
+  "a": 5.5
+}
+"""
+    )

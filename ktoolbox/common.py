@@ -555,6 +555,21 @@ def json_parse_list(jstr: str, *, strict_parsing: bool = False) -> list[Any]:
     return lst
 
 
+def json_dump(
+    data: Any,
+    file: Union[str, pathlib.Path, typing.IO[str]],
+) -> None:
+    def _dump(file: typing.IO[str]) -> None:
+        json.dump(data, file, indent=2)
+        file.write("\n")
+
+    if isinstance(file, (str, pathlib.Path)):
+        with open(file, "w") as f:
+            _dump(f)
+    else:
+        _dump(file)
+
+
 def dict_add_optional(vdict: dict[T1, T2], key: T1, val: Optional[T2]) -> None:
     if val is not None:
         vdict[key] = val
