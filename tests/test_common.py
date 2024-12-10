@@ -1193,6 +1193,10 @@ def test_path_norm() -> None:
 
     confs = [
         Conf("", "."),
+        Conf("", "foo/", cwd="foo", normpath="."),
+        Conf("", "foo/", cwd="foo/", normpath="."),
+        Conf("", "foo", cwd="foo", preserve_dir=False, normpath="."),
+        Conf("", "foo", cwd="./foo/", preserve_dir=False, normpath="."),
         Conf(".", "."),
         Conf("/tmp/.", "/tmp/", normpath="/tmp"),
         Conf("/a/..//././bbb///", "/a/../bbb/", normpath="/bbb"),
