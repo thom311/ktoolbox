@@ -23,5 +23,6 @@ def test_render() -> None:
 def test_render_file() -> None:
     in_buffer = io.StringIO("val: {{a}}")
     out_buffer = io.StringIO()
-    kjinja2.render_file(in_buffer, out_buffer, {"a": 1})
-    assert out_buffer.getvalue() == "val: 1"
+    y1 = kjinja2.render_file(in_buffer, {"a": 1}, out_file=out_buffer)
+    assert y1 == "val: 1"
+    assert out_buffer.getvalue() == y1
