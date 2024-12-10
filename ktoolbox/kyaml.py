@@ -5,6 +5,8 @@ import yaml
 from typing import Any
 from typing import Union
 
+from . import common
+
 
 class YamlDumper(yaml.SafeDumper):
     """
@@ -22,18 +24,14 @@ def dump(
     arg: Any,
     file: Union[str, pathlib.Path, typing.IO[str]],
 ) -> None:
-    if isinstance(file, (str, pathlib.Path)):
-        with open(file, "w") as f:
-            dump(arg, f)
-            return
-
-    yaml.dump(
-        arg,
-        stream=file,
-        default_flow_style=False,
-        sort_keys=False,
-        Dumper=YamlDumper,
-    )
+    with common.use_or_open(file, mode="w") as f:
+        yaml.dump(
+            arg,
+            stream=f,
+            default_flow_style=False,
+            sort_keys=False,
+            Dumper=YamlDumper,
+        )
 
 
 def dumps(arg: Any) -> str:
