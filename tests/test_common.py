@@ -1238,6 +1238,17 @@ def test_path_norm() -> None:
             assert r2 == conf.normpath
             assert conf.result != conf.normpath
 
+    assert common.path_norm("foo", cwd="path") == "path/foo"
+    assert common.path_norm("foo", cwd="path") == "path/foo"
+
+    s1 = common.path_norm("foo", cwd="path", make_absolute=True)
+    assert s1 == os.path.join(os.getcwd(), "path/foo")
+    assert os.path.isabs(s1)
+
+    s1 = common.path_norm("foo", cwd="/path", make_absolute=True)
+    assert s1 == "/path/foo"
+    assert os.path.isabs(s1)
+
 
 def test_iter_listify() -> None:
     @common.iter_listify

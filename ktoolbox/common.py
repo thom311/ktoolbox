@@ -327,6 +327,7 @@ def path_norm(
     *,
     cwd: Optional[Union[str, pathlib.Path]] = None,
     preserve_dir: bool = False,
+    make_absolute: bool = False,
 ) -> TPathNormPath:
     """
     Normalize a path while preserving symbolic links and other specific rules.
@@ -338,6 +339,10 @@ def path_norm(
       directory.
     preserve_dir (bool): If True and the path is a directory, the trailing
       slash is preserved.
+    make_absolute: relative paths will always be completed with "cwd" (if provided).
+      If "cwd" is not given or also a relative path, then the result is still a
+      relative path. If `make_absolute` is given, such relative path is made
+      absolute using os.getcwd().
 
     Returns:
     str: The normalized path.
@@ -369,6 +374,10 @@ def path_norm(
         if cwd:
             path_str = os.path.join(cwd, path_str)
             is_abs = path_str.startswith("/")
+
+    if not is_abs and make_absolute:
+        path_str = os.path.join(os.getcwd(), path_str)
+        is_abs = True
 
     parts: list[str] = []
     trailing_slash = False
