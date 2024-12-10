@@ -409,6 +409,24 @@ def path_norm(
     return typing.cast(TPathNormPath, result)
 
 
+@contextlib.contextmanager
+def use_or_open(
+    file: Union[str, pathlib.Path, typing.IO[str]],
+    *,
+    mode: Literal["r", "w"] = "r",
+) -> typing.Generator[typing.IO[str], None, None]:
+    f: typing.IO[str]
+    if isinstance(file, (str, pathlib.Path)):
+        f = open(file, mode=mode)
+    else:
+        f = file
+    try:
+        yield f
+    finally:
+        if f is not file:
+            f.close()
+
+
 def enum_convert(
     enum_type: type[E],
     value: Any,
@@ -559,15 +577,9 @@ def json_dump(
     data: Any,
     file: Union[str, pathlib.Path, typing.IO[str]],
 ) -> None:
-    def _dump(file: typing.IO[str]) -> None:
-        json.dump(data, file, indent=2)
-        file.write("\n")
-
-    if isinstance(file, (str, pathlib.Path)):
-        with open(file, "w") as f:
-            _dump(f)
-    else:
-        _dump(file)
+    with use_or_open(file, mode="w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
 
 
 def dict_add_optional(vdict: dict[T1, T2], key: T1, val: Optional[T2]) -> None:

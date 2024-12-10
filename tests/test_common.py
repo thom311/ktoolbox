@@ -1358,3 +1358,19 @@ def test_json_dump() -> None:
 }
 """
     )
+
+
+def test_file_or_open(tmp_path: pathlib.Path) -> None:
+    tmp_file = tmp_path / "file1"
+
+    with common.use_or_open(tmp_file, mode="w") as f:
+        f.write("hello")
+
+    with open(tmp_file) as f1:
+        with common.use_or_open(f1) as f:
+            assert f.read() == "hello"
+
+    buffer = io.StringIO()
+    with common.use_or_open(buffer, mode="w") as f:
+        f.write("hello")
+    assert buffer.getvalue() == "hello"
