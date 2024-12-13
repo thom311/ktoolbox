@@ -136,8 +136,7 @@ def iter_get_first(
     unique: typing.Literal[True],
     force_unique: typing.Literal[True],
     single: bool = False,
-) -> T:
-    pass
+) -> T: ...
 
 
 @typing.overload
@@ -147,8 +146,7 @@ def iter_get_first(
     unique: bool = False,
     force_unique: bool = False,
     single: typing.Literal[True],
-) -> T:
-    pass
+) -> T: ...
 
 
 @typing.overload
@@ -158,8 +156,7 @@ def iter_get_first(
     unique: bool = False,
     force_unique: bool = False,
     single: bool = False,
-) -> Optional[T]:
-    pass
+) -> Optional[T]: ...
 
 
 def iter_get_first(
@@ -594,8 +591,7 @@ def dict_get_typed(
     vtype: type[T],
     *,
     allow_missing: Literal[False] = False,
-) -> T:
-    pass
+) -> T: ...
 
 
 @typing.overload
@@ -605,8 +601,7 @@ def dict_get_typed(
     vtype: type[T],
     *,
     allow_missing: bool = False,
-) -> Optional[T]:
-    pass
+) -> Optional[T]: ...
 
 
 def dict_get_typed(
@@ -1225,8 +1220,7 @@ def structparse_pop_enum(
     *,
     enum_type: type[E],
     default: Union[E, _MISSING_TYPE] = MISSING,
-) -> E:
-    pass
+) -> E: ...
 
 
 @typing.overload
@@ -1235,8 +1229,7 @@ def structparse_pop_enum(
     *,
     enum_type: type[E],
     default: Literal[None],
-) -> Optional[E]:
-    pass
+) -> Optional[E]: ...
 
 
 def structparse_pop_enum(
@@ -1344,8 +1337,7 @@ def structparse_pop_objlist_to_dict(
     get_key: Literal[None] = None,
     allow_empty: bool = True,
     allow_duplicates: bool = False,
-) -> dict[str, TStructParseBaseNamed]:
-    pass
+) -> dict[str, TStructParseBaseNamed]: ...
 
 
 @typing.overload
@@ -1356,8 +1348,7 @@ def structparse_pop_objlist_to_dict(
     get_key: typing.Callable[[T], T2],
     allow_empty: bool = True,
     allow_duplicates: bool = False,
-) -> dict[T2, T]:
-    pass
+) -> dict[T2, T]: ...
 
 
 def structparse_pop_objlist_to_dict(
