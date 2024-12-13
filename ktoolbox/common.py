@@ -82,6 +82,12 @@ MISSING = _MISSING_TYPE()
 KW_ONLY_DATACLASS = {"kw_only": True} if "kw_only" in dataclass.__kwdefaults__ else {}
 
 
+def raise_exception(ex: Exception) -> typing.NoReturn:
+    # raises exception. This exists because raise is a statement that cannot be
+    # used at certain places (like a lambda function).
+    raise ex
+
+
 def bool_to_str(val: bool, *, format: str = "true") -> str:
     if format == "true":
         return "true" if val else "false"
