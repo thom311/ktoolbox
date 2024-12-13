@@ -1104,6 +1104,8 @@ def structparse_pop_str(
     empty_as_default: Optional[bool] = None,
     allow_empty: Optional[bool] = None,
     check: Optional[typing.Callable[[str], bool]] = None,
+    check_missing: Optional[typing.Callable[[StructParsePopContext], None]] = None,
+    check_ctx: Optional[typing.Callable[[StructParsePopContext, str], None]] = None,
 ) -> Union[str, TOptionalStr]:
     """
     Pop "key" from "vdict", validates that it's a string and returns it.
@@ -1133,15 +1135,22 @@ def structparse_pop_str(
     if v is not None and not isinstance(v, str):
         raise pargs.value_error(f"expects a string but got {repr(v)}")
     if v is None or (not v and empty_as_default):
+        if check_missing is not None:
+            check_missing(pargs)
         if isinstance(default, _MISSING_TYPE):
             raise pargs.value_error("mandatory key missing")
         return default
     if not v:
         if not allow_empty:
             raise pargs.value_error("cannot be an empty string")
+
     if check is not None:
         if not check(v):
             raise pargs.value_error("invalid string")
+
+    if check_ctx is not None:
+        check_ctx(pargs, v)
+
     return typing.cast(TOptionalStr, v)
 
 
@@ -1162,6 +1171,7 @@ def structparse_pop_int(
     *,
     default: Union[TOptionalInt, _MISSING_TYPE] = MISSING,
     check: Optional[typing.Callable[[int], bool]] = None,
+    check_ctx: Optional[typing.Callable[[StructParsePopContext, float], None]] = None,
     description: str = "a number",
 ) -> Union[int, TOptionalInt]:
     v = pargs.pop_value()
@@ -1173,9 +1183,14 @@ def structparse_pop_int(
         val = int(v)
     except Exception:
         raise pargs.value_error(f"expects {description} but got {repr(v)}")
+
     if check is not None:
         if not check(val):
             raise pargs.value_error(f"expects {description} but got {repr(v)}")
+
+    if check_ctx is not None:
+        check_ctx(pargs, val)
+
     return val
 
 
@@ -1184,6 +1199,7 @@ def structparse_pop_float(
     *,
     default: Union[TOptionalFloat, _MISSING_TYPE] = MISSING,
     check: Optional[typing.Callable[[float], bool]] = None,
+    check_ctx: Optional[typing.Callable[[StructParsePopContext, float], None]] = None,
     description: str = "a floating point number",
 ) -> Union[float, TOptionalFloat]:
     v = pargs.pop_value()
@@ -1197,9 +1213,14 @@ def structparse_pop_float(
         val = float(v)
     except Exception:
         raise pargs.value_error(f"expects {description} but got {repr(v)}")
+
     if check is not None:
         if not check(val):
             raise pargs.value_error(f"expects {description} but got {repr(v)}")
+
+    if check_ctx is not None:
+        check_ctx(pargs, val)
+
     return val
 
 
@@ -1207,17 +1228,30 @@ def structparse_pop_bool(
     pargs: StructParsePopContext,
     *,
     default: Union[TOptionalBool, _MISSING_TYPE] = MISSING,
+    check_ctx: Optional[typing.Callable[[StructParsePopContext, float], None]] = None,
     description: str = "a boolean",
 ) -> Union[bool, TOptionalBool]:
+    has_default = not isinstance(default, _MISSING_TYPE)
     v = pargs.pop_value()
     try:
         # Just like str_to_bool(), we accept "", "default", and "-1" as default
         # values (if `default` is not MISSING).
-        return str_to_bool(v, on_default=default)
+        val = str_to_bool(v, on_default=None if has_default else MISSING)
     except Exception:
         if v is None:
             raise pargs.value_error(f"requires {description}")
         raise pargs.value_error(f"expects {description} but got {repr(v)}")
+
+    if val is None:
+        assert not isinstance(default, _MISSING_TYPE)
+        return default
+
+    # Like other check_ctx() callbacks, we don't call them for a
+    # default value.
+    if check_ctx is not None:
+        check_ctx(pargs, val)
+
+    return val
 
 
 @typing.overload
@@ -1297,6 +1331,7 @@ def structparse_pop_obj(
     *,
     construct: typing.Callable[[StructParseParseContext], T],
     default: Union[T2, _MISSING_TYPE] = MISSING,
+    check_ctx: Optional[typing.Callable[[StructParsePopContext, T], None]] = None,
     construct_default: bool = False,
 ) -> Union[T, T2]:
     """
@@ -1309,13 +1344,20 @@ def structparse_pop_obj(
     is returned for missing keys.
     """
     v = pargs.pop_value()
-    if not construct_default and v is None:
+    is_default = v is None
+    if not construct_default and is_default:
         if isinstance(default, _MISSING_TYPE):
             raise pargs.value_error("mandatory key missing")
         return default
 
     pctx = StructParseParseContext(v, pargs.yamlpath)
-    return construct(pctx)
+
+    obj = construct(pctx)
+
+    if not is_default and check_ctx is not None:
+        check_ctx(pargs, obj)
+
+    return obj
 
 
 def structparse_pop_objlist(
