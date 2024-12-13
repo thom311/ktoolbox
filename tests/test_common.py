@@ -734,6 +734,77 @@ def test_structparse_pop_str_1() -> None:
         typing.assert_type(val5, str)
     assert val5 == "strval"
 
+    val6 = common.structparse_pop_str(
+        _pargs("strval"),
+        check=lambda val: True,
+    )
+    assert val6 == "strval"
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str(
+            _pargs("strval"),
+            check=lambda val: False,
+        )
+
+    assert (
+        common.structparse_pop_str(
+            _pargs("strval"),
+            check_ctx=lambda pargs2, val: None,
+        )
+        == "strval"
+    )
+
+    def _check_none() -> None:
+        return None
+
+    assert (
+        common.structparse_pop_str(
+            _pargs("strval"),
+            check_ctx=lambda pargs2, val: _check_none(),
+        )
+        == "strval"
+    )
+
+    def _check1(pargs: StructParsePopContext, val: str) -> None:
+        assert pargs.key == "foo"
+        assert val == "strval"
+
+    common.structparse_pop_str(
+        _pargs("strval"),
+        check_ctx=lambda pargs2, val: _check1(pargs2, val),
+    )
+
+    val8 = common.structparse_pop_str(
+        _pargs("strval"),
+        check_ctx=_check1,
+    )
+    assert val8 == "strval"
+
+    def _check2(pargs: StructParsePopContext, val: str) -> None:
+        assert pargs.key == "foo"
+        assert val == "strval"
+        raise pargs.value_error("hi")
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str(
+            _pargs("strval"),
+            check_ctx=_check2,
+        )
+
+    if sys.version_info >= (3, 11):
+        common.structparse_pop_str(
+            _pargs("strval"),
+            check=lambda val: bool(typing.assert_type(val, str)) or True,
+        )
+
+    if sys.version_info >= (3, 11):
+        common.structparse_pop_str(
+            _pargs("strval"),
+            check_ctx=lambda pargs2, val: (
+                None if typing.assert_type(val, str) else None
+            ),
+        )
+
 
 def test_structparse_pop_str_empty() -> None:
     def _check(x: str) -> bool:
@@ -930,6 +1001,35 @@ def test_structparse_pop_bool() -> None:
         typing.assert_type(val5, bool)
     assert val5 is True
 
+    assert (
+        common.structparse_pop_bool(
+            _pargs(),
+            default=None,
+        )
+        is None
+    )
+
+    assert (
+        common.structparse_pop_bool(
+            _pargs(),
+            default=None,
+            check_ctx=lambda pargs, val: common.raise_exception(RuntimeError()),
+        )
+        is None
+    )
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_bool(
+            _pargs(1),
+            check_ctx=lambda pargs, val: common.raise_exception(RuntimeError()),
+        )
+
+    with pytest.raises(RuntimeError):
+        common.structparse_pop_bool(
+            _pargs(True),
+            check_ctx=lambda pargs, val: common.raise_exception(RuntimeError()),
+        )
+
 
 def test_structparse_pop_enum() -> None:
     with pytest.raises(ValueError):
@@ -1043,6 +1143,34 @@ def test_structparse_pop_obj() -> None:
     if sys.version_info >= (3, 11):
         typing.assert_type(v6, int)
     assert v6 == -1
+
+    assert (
+        common.structparse_pop_obj(
+            _pargs(),
+            default=None,
+            construct=lambda pctx: common.raise_exception(RuntimeError()),
+            check_ctx=lambda pargs, obj: common.raise_exception(RuntimeError()),
+        )
+        is None
+    )
+
+    assert (
+        common.structparse_pop_obj(
+            _pargs("xxx"),
+            construct=lambda pctx: pctx.arg,
+            check_ctx=lambda pargs, obj: obj.strip(),
+        )
+        == "xxx"
+    )
+
+    assert (
+        common.structparse_pop_obj(
+            _pargs("xxx"),
+            construct=lambda pctx: typing.cast(str, pctx.arg),
+            check_ctx=lambda pargs, obj: None if obj.strip() else None,
+        )
+        == "xxx"
+    )
 
 
 def test_structparse_pop_list() -> None:
