@@ -368,8 +368,7 @@ class Host(ABC):
         decode_errors: Optional[str] = None,
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
-    ) -> Result:
-        pass
+    ) -> Result: ...
 
     @typing.overload
     def run(
@@ -390,8 +389,7 @@ class Host(ABC):
         decode_errors: Optional[str] = None,
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
-    ) -> BinResult:
-        pass
+    ) -> BinResult: ...
 
     @typing.overload
     def run(
@@ -414,8 +412,7 @@ class Host(ABC):
         decode_errors: Optional[str] = None,
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
-    ) -> Union[Result, BinResult]:
-        pass
+    ) -> Union[Result, BinResult]: ...
 
     def run(
         self,
