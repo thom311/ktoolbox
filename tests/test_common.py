@@ -161,6 +161,16 @@ def test_enum_convert() -> None:
         TstTestType.IPERF_UDP,
     ]
 
+    assert enum_convert_list(TstTestType, "*") == list(TstTestType)
+    assert enum_convert_list(TstTestType, "1-100") == list(TstTestType)
+    with pytest.raises(ValueError):
+        enum_convert_list(TstTestType, "*", default_range=None)
+    with pytest.raises(ValueError):
+        enum_convert_list(TstTestType, "1-*")
+    assert enum_convert_list(
+        TstTestType, "*", default_range=[TstTestType.HTTP, TstTestType.IPERF_TCP]
+    ) == [TstTestType.HTTP, TstTestType.IPERF_TCP]
+
     class E1(Enum):
         Vm4 = -4
         V1 = 1

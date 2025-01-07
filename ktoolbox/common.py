@@ -474,7 +474,12 @@ def enum_convert(
     raise ValueError(f"Invalid type for conversion to {enum_type}")
 
 
-def enum_convert_list(enum_type: type[E], value: Any) -> list[E]:
+def enum_convert_list(
+    enum_type: type[E],
+    value: Any,
+    *,
+    default_range: Union[None, list[E], _MISSING_TYPE] = MISSING,
+) -> list[E]:
     output: list[E] = []
 
     if isinstance(value, str):
@@ -493,8 +498,14 @@ def enum_convert_list(enum_type: type[E], value: Any) -> list[E]:
                 cases = None
 
             if part == "*":
-                # Shorthand for the entire range (sorted by numeric values)
-                cases = sorted(enum_type, key=lambda e: e.value)
+                if default_range is None:
+                    # no special treatment of "*"
+                    pass
+                elif isinstance(default_range, _MISSING_TYPE):
+                    # Shorthand for the entire range (sorted by numeric values)
+                    cases = sorted(enum_type, key=lambda e: e.value)
+                else:
+                    cases = default_range
 
             if cases is None:
                 # Could not be parsed as single entry. Try to parse as range.
