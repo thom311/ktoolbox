@@ -478,7 +478,7 @@ def enum_convert_list(
     enum_type: type[E],
     value: Any,
     *,
-    default_range: Union[None, list[E], _MISSING_TYPE] = MISSING,
+    default_range: Union[None, Iterable[E], _MISSING_TYPE] = MISSING,
 ) -> list[E]:
     output: list[E] = []
 
@@ -505,6 +505,9 @@ def enum_convert_list(
                     # Shorthand for the entire range (sorted by numeric values)
                     cases = sorted(enum_type, key=lambda e: e.value)
                 else:
+                    if not isinstance(default_range, list):
+                        # Ensure we iterate the input argument only once.
+                        default_range = list(default_range)
                     cases = default_range
 
             if cases is None:
