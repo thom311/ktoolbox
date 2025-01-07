@@ -358,7 +358,7 @@ def path_norm(
         function collapses all duplicate slashes into a single `/`.
     """
     if path is None:
-        return None
+        return typing.cast(TPathNormPath, None)
 
     path_orig = path
 
