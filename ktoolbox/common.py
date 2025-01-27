@@ -2041,3 +2041,12 @@ def get_current_host() -> str:
     if res.success and (c := res.out.strip()):
         return c
     raise RuntimeError(f"Failure detecting current hostname: {res}")
+
+
+def argparse_regex_type(value: str) -> re.Pattern[str]:
+    try:
+        return re.compile(value)
+    except re.error as e:
+        import argparse
+
+        raise argparse.ArgumentTypeError(f"Invalid regex pattern: {e}")

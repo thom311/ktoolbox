@@ -1,3 +1,4 @@
+import argparse
 import dataclasses
 import io
 import json
@@ -5,6 +6,7 @@ import os
 import pathlib
 import pytest
 import random
+import re
 import sys
 import typing
 
@@ -1512,3 +1514,24 @@ def test_file_or_open(tmp_path: pathlib.Path) -> None:
     with common.use_or_open(buffer, mode="w") as f:
         f.write("hello")
     assert buffer.getvalue() == "hello"
+
+
+def test_argparse_regex_type() -> None:
+
+    pattern = common.argparse_regex_type("regex")
+    assert isinstance(pattern, re.Pattern)
+    assert pattern.pattern == "regex"
+
+    with pytest.raises(argparse.ArgumentTypeError):
+        common.argparse_regex_type("broken1[")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pattern", type=common.argparse_regex_type)
+
+    args = parser.parse_args(["--pattern", "regex"])
+    assert isinstance(args.pattern, re.Pattern)
+    assert args.pattern.pattern == "regex"
+
+    with pytest.raises(SystemExit) as ex:
+        parser.parse_args(["--pattern", "broken["])
+    assert isinstance(ex.value, SystemExit)
