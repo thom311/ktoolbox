@@ -2024,3 +2024,20 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
                     self._cancellable_is_cancelled = True
         self.join()
         return self.future.result()
+
+
+@functools.cache
+def get_current_host() -> str:
+    chost = os.environ.get("KTOOLBOX_CURRENT_HOST")
+    if chost:
+        return chost
+
+    from . import host
+
+    res = host.local.run(
+        ("hostname", "-f"),
+        log_level_fail=logging.ERROR,
+    )
+    if res.success and (c := res.out.strip()):
+        return c
+    raise RuntimeError(f"Failure detecting current hostname: {res}")
