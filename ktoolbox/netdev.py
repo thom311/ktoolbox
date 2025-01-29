@@ -614,7 +614,7 @@ def sysctl_read(
 
 
 def sysctl_phys_port_name_parse(
-    s: Optional[Union[str, bytes]]
+    s: Optional[Union[str, bytes]],
 ) -> Optional[tuple[int, int]]:
     # Parses the output of /sys/class/net/$IFNAME/phys_port_name
     #

@@ -252,7 +252,7 @@ if sys.version_info >= (3, 10):
 if sys.version_info >= (3, 10):
 
     def iter_listify(
-        fcn: typing.Callable[P, Iterable[T]]
+        fcn: typing.Callable[P, Iterable[T]],
     ) -> typing.Callable[P, list[T]]:
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> list[T]:
             return list(fcn(*args, **kwargs))
@@ -262,7 +262,7 @@ if sys.version_info >= (3, 10):
 else:
 
     def iter_listify(
-        fcn: typing.Callable[..., Iterable[T]]
+        fcn: typing.Callable[..., Iterable[T]],
     ) -> typing.Callable[..., list[T]]:
         def wrapper(*args: Any, **kwargs: Any) -> list[T]:
             return list(fcn(*args, **kwargs))
@@ -273,7 +273,7 @@ else:
 if sys.version_info >= (3, 10):
 
     def iter_tuplify(
-        fcn: typing.Callable[P, Iterable[T]]
+        fcn: typing.Callable[P, Iterable[T]],
     ) -> typing.Callable[P, tuple[T, ...]]:
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> tuple[T, ...]:
             return tuple(fcn(*args, **kwargs))
@@ -283,7 +283,7 @@ if sys.version_info >= (3, 10):
 else:
 
     def iter_tuplify(
-        fcn: typing.Callable[..., Iterable[T]]
+        fcn: typing.Callable[..., Iterable[T]],
     ) -> typing.Callable[..., tuple[T, ...]]:
         def wrapper(*args: Any, **kwargs: Any) -> tuple[T, ...]:
             return tuple(fcn(*args, **kwargs))
@@ -294,7 +294,7 @@ else:
 if sys.version_info >= (3, 10):
 
     def iter_dictify(
-        fcn: typing.Callable[P, Iterable[tuple[T1, T2]]]
+        fcn: typing.Callable[P, Iterable[tuple[T1, T2]]],
     ) -> typing.Callable[P, dict[T1, T2]]:
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> dict[T1, T2]:
             return dict(fcn(*args, **kwargs))
@@ -304,7 +304,7 @@ if sys.version_info >= (3, 10):
 else:
 
     def iter_dictify(
-        fcn: typing.Callable[..., Iterable[tuple[T1, T2]]]
+        fcn: typing.Callable[..., Iterable[tuple[T1, T2]]],
     ) -> typing.Callable[..., dict[T1, T2]]:
         def wrapper(*args: Any, **kwargs: Any) -> dict[T1, T2]:
             return dict(fcn(*args, **kwargs))
@@ -646,7 +646,7 @@ def dict_get_typed(
 
 
 def serialize_enum(
-    data: Union[Enum, dict[Any, Any], list[Any], Any]
+    data: Union[Enum, dict[Any, Any], list[Any], Any],
 ) -> Union[str, dict[Any, Any], list[Any], Any]:
     if isinstance(data, Enum):
         return data.name
@@ -1580,7 +1580,7 @@ def etc_hosts_update_data(
     lineregex = re.compile(r"^\s*[a-fA-F0-9:.]+\s+([-a-zA-Z0-9_.]+)(\s+.*)?$")
 
     def _unpack(
-        v: tuple[str, Optional[Iterable[str]]]
+        v: tuple[str, Optional[Iterable[str]]],
     ) -> Union[Literal[False], tuple[str, tuple[str, ...]]]:
         n, a = v
         if a is None:
