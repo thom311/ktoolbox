@@ -3,17 +3,17 @@ import logging
 import os
 import random
 import shlex
-import sys
 import typing
 import yaml
 
 from collections.abc import Iterable
 from typing import Union
 
+from . import common
 from . import host
 
 
-logger = logging.getLogger(__name__)
+logger = common.ExtendedLogger(__name__)
 
 
 class K8sClient:
@@ -121,13 +121,12 @@ class K8sClient:
         if not isinstance(data, dict):
             cmd_s = shlex.join(self._get_oc_cmd_full(cmd=cmd, namespace=namespace))
             if not may_fail or die_on_error:
-                logger.error(
-                    f"Command {cmd_s} did not return a JSON dictionary but {ret.debug_str()}"
+                logger.error_and_exit(
+                    f"Command {cmd_s} did not return a JSON dictionary but {ret.debug_str()}",
+                    die_on_error=die_on_error,
                 )
             else:
                 logger.debug(f"Command {cmd_s} did not return a JSON dictionary")
-            if die_on_error:
-                sys.exit(-1)
             return None
 
         return data
