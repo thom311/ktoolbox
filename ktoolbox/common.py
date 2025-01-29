@@ -1918,14 +1918,60 @@ class ExtendedLogger(logging.Logger):
         logger = object.__getattribute__(self, "wrapped_logger")
         return logger.__getattribute__(name)
 
+    @typing.overload
     def error_and_exit(
         self,
         msg: str,
         *,
         exit_code: int = -1,
         backtrace: bool = True,
-    ) -> typing.NoReturn:
+        die_on_error: Literal[False],
+    ) -> None: ...
+
+    @typing.overload
+    def error_and_exit(
+        self,
+        msg: str,
+        *,
+        exit_code: int = -1,
+        backtrace: bool = True,
+        die_on_error: Literal[True] = True,
+    ) -> typing.NoReturn: ...
+
+    @typing.overload
+    def error_and_exit(
+        self,
+        msg: str,
+        *,
+        exit_code: int = -1,
+        backtrace: bool = True,
+        die_on_error: bool = True,
+    ) -> Union[None, typing.NoReturn]: ...
+
+    def error_and_exit(
+        self,
+        msg: str,
+        *,
+        exit_code: int = -1,
+        backtrace: bool = True,
+        die_on_error: bool = True,
+    ) -> Union[None, typing.NoReturn]:
         self.error(msg)
+
+        if not die_on_error:
+            # Usually, error_and_exit() does what it says (it exists).
+            #
+            # However, if the caller also has a "die_on_error" variable, they
+            # would need to do something like:
+            #
+            #    if die_on_error:
+            #        logger.error_and_exit("error message")
+            #    else:
+            #        logger.error("error message")
+            #
+            # With the die_on_error argument, the caller can downgrade the
+            # error_and_exit() to a plain error().
+            return None
 
         if backtrace:
             import traceback
