@@ -1,5 +1,5 @@
 -r requirements.txt
-black
+black==24.4.2
 flake8
 mypy
 pytest
