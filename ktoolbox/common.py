@@ -1918,8 +1918,20 @@ class ExtendedLogger(logging.Logger):
         logger = object.__getattribute__(self, "wrapped_logger")
         return logger.__getattribute__(name)
 
-    def error_and_exit(self, msg: str, *, exit_code: int = -1) -> typing.NoReturn:
+    def error_and_exit(
+        self,
+        msg: str,
+        *,
+        exit_code: int = -1,
+        backtrace: bool = True,
+    ) -> typing.NoReturn:
         self.error(msg)
+
+        if backtrace:
+            import traceback
+
+            self.error(f"FATAL ERROR. BACKTRACE:\n{''.join(traceback.format_stack())}")
+
         sys.exit(exit_code)
 
 
