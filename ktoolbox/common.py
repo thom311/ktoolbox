@@ -36,6 +36,9 @@ if typing.TYPE_CHECKING:
     import argparse
 
 
+FATAL_EXIT_CODE = 255
+
+
 common_lock = threading.Lock()
 
 logger = logging.getLogger(__name__)
@@ -1923,7 +1926,7 @@ class ExtendedLogger(logging.Logger):
         self,
         msg: str,
         *,
-        exit_code: int = -1,
+        exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
         die_on_error: Literal[False],
     ) -> None: ...
@@ -1933,7 +1936,7 @@ class ExtendedLogger(logging.Logger):
         self,
         msg: str,
         *,
-        exit_code: int = -1,
+        exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
         die_on_error: Literal[True] = True,
     ) -> typing.NoReturn: ...
@@ -1943,7 +1946,7 @@ class ExtendedLogger(logging.Logger):
         self,
         msg: str,
         *,
-        exit_code: int = -1,
+        exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
         die_on_error: bool = True,
     ) -> Union[None, typing.NoReturn]: ...
@@ -1952,7 +1955,7 @@ class ExtendedLogger(logging.Logger):
         self,
         msg: str,
         *,
-        exit_code: int = -1,
+        exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
         die_on_error: bool = True,
     ) -> Union[None, typing.NoReturn]:

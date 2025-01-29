@@ -655,7 +655,7 @@ class Host(ABC):
             logger.error(
                 f"FATAL ERROR. BACKTRACE:\n{''.join(traceback.format_stack())}"
             )
-            sys.exit(-1)
+            sys.exit(common.FATAL_EXIT_CODE)
 
         if str_result is not None:
             return str_result
