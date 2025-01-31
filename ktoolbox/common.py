@@ -1666,7 +1666,8 @@ class Serial:
     def send(self, msg: str, *, sleep: float = 1) -> None:
         logger.debug(f"serial[{self.port}]: send {repr(msg)}")
         self._ser.write(msg.encode("utf-8", errors="surrogateescape"))
-        time.sleep(sleep)
+        if sleep > 0:
+            self.expect(pattern=None, timeout=sleep)
 
     def read_all(self, *, max_read: Optional[int] = None) -> tuple[int, int]:
         byte_readcount = 0
@@ -1699,17 +1700,17 @@ class Serial:
 
     def expect(
         self,
-        pattern: Union[str, re.Pattern[str]],
+        pattern: Union[None, str, re.Pattern[str]],
         timeout: float = 30,
     ) -> str:
         import select
 
         end_timestamp = time.monotonic() + timeout
-        first_run = True
 
-        logger.debug(f"serial[{self.port}]: expect message {repr(pattern)}")
-
-        if isinstance(pattern, str):
+        pattern_re: Optional[re.Pattern[str]]
+        if pattern is None:
+            pattern_re = None
+        elif isinstance(pattern, str):
             # We use DOTALL like pexpect does.
             # If you need something else, compile the pattern yourself.
             #
@@ -1718,29 +1719,33 @@ class Serial:
         else:
             pattern_re = pattern
 
+        if pattern_re is not None:
+            logger.debug(f"serial[{self.port}]: expect message {repr(pattern)}")
+
         while True:
             self.read_all()
-            matches = re.finditer(pattern_re, self._buffer)
-            for match in matches:
-                end_idx = match.end()
-                logger.debug(
-                    f"serial[{self.port}]: found expected message {end_idx} unicode characters, {len(self._buffer) - end_idx} remaning"
-                )
-                self._buffer = self._buffer[end_idx:]
-                return self._buffer
 
-            if first_run:
-                first_run = False
-            else:
-                remaining_time = end_timestamp - time.monotonic()
-                if remaining_time <= 0:
+            if pattern_re is not None:
+                matches = re.finditer(pattern_re, self._buffer)
+                for match in matches:
+                    end_idx = match.end()
+                    logger.debug(
+                        f"serial[{self.port}]: found expected message {end_idx} unicode characters, {len(self._buffer) - end_idx} remaning"
+                    )
+                    self._buffer = self._buffer[end_idx:]
+                    return self._buffer
+
+            remaining_time = end_timestamp - time.monotonic()
+            if remaining_time <= 0:
+                if pattern_re is not None:
                     logger.debug(
                         f"serial[{self.port}]: did not find expected message {repr(pattern)} (buffer content is {repr(self._buffer)})"
                     )
                     raise RuntimeError(
                         f"Did not receive expected message {repr(pattern)} within timeout (buffer content is {repr(self._buffer)})"
                     )
-                _, _, _ = select.select([self._ser], [], [], remaining_time)
+                return self._buffer
+            _, _, _ = select.select([self._ser], [], [], remaining_time)
 
     def __enter__(self) -> "Serial":
         return self
