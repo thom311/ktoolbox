@@ -91,6 +91,11 @@ def raise_exception(ex: Exception) -> typing.NoReturn:
     raise ex
 
 
+def char_is_surrogateescaped(char: str) -> bool:
+    """Returns True if the character is a surrogate escape (i.e., originally an invalid UTF-8 byte)."""
+    return 0xDC80 <= ord(char) <= 0xDCFF
+
+
 def bool_to_str(val: bool, *, format: str = "true") -> str:
     if format == "true":
         return "true" if val else "false"
@@ -1654,11 +1659,18 @@ class Serial:
 
         self.port = port
         self._ser = serial.Serial(port, baudrate=baudrate, timeout=0)
-        self._buffer = ""
+        self._bin_buf = b""
+        self._str_buf: Optional[str] = None
 
     @property
     def buffer(self) -> str:
-        return self._buffer
+        if self._str_buf is None:
+            self._str_buf = self._bin_buf.decode("utf-8", errors="surrogateescape")
+        return self._str_buf
+
+    @property
+    def bin_buffer(self) -> bytes:
+        return self._bin_buf
 
     def close(self) -> None:
         self._ser.close()
@@ -1669,13 +1681,12 @@ class Serial:
         if sleep > 0:
             self.expect(pattern=None, timeout=sleep)
 
-    def read_all(self, *, max_read: Optional[int] = None) -> tuple[int, int]:
+    def read_all(self, *, max_read: Optional[int] = None) -> int:
         byte_readcount = 0
-        char_readcount = 0
         while True:
             if max_read is not None:
                 if byte_readcount >= max_read:
-                    return byte_readcount, char_readcount
+                    return byte_readcount
                 readsize = min(100, max_read - byte_readcount)
             else:
                 readsize = 100
@@ -1685,24 +1696,32 @@ class Serial:
             if buf:
                 s = buf.decode("utf-8", errors="surrogateescape")
                 logger.debug(
-                    f"serial[{self.port}]: read buffer ({len(self._buffer)} + {len(s)} unicode characters): {repr(s)}"
+                    f"serial[{self.port}]: read buffer ({len(self._bin_buf)} + {len(buf)} bytes): {repr(s)}"
                 )
-                self._buffer += s
+                if not self._bin_buf:
+                    self._str_buf = s
+                elif (
+                    self._str_buf
+                    and not char_is_surrogateescaped(self._str_buf[-1])
+                    and not char_is_surrogateescaped(s[0])
+                ):
+                    self._str_buf += s
+                else:
+                    self._str_buf = None
+                self._bin_buf += buf
                 byte_readcount += len(buf)
-                char_readcount += len(s)
 
-            if not buf or len(buf) < readsize:
+            if len(buf) < readsize:
                 # Partial read. Return.
                 #
-                # The read data was appended to the internal self._buffer. The
-                # last char_readcount are newly read.
-                return byte_readcount, char_readcount
+                # The read data was appended to the internal self._bin_buf.
+                return byte_readcount
 
     def expect(
         self,
         pattern: Union[None, str, re.Pattern[str]],
         timeout: float = 30,
-    ) -> str:
+    ) -> Optional[str]:
         import select
 
         end_timestamp = time.monotonic() + timeout
@@ -1726,25 +1745,34 @@ class Serial:
             self.read_all()
 
             if pattern_re is not None:
-                matches = re.finditer(pattern_re, self._buffer)
+                buffer = self.buffer
+                matches = re.finditer(pattern_re, buffer)
                 for match in matches:
                     end_idx = match.end()
-                    logger.debug(
-                        f"serial[{self.port}]: found expected message {end_idx} unicode characters, {len(self._buffer) - end_idx} remaning"
+                    consumed_chars = buffer[:end_idx]
+                    consumed_bytes = consumed_chars.encode(
+                        "utf-8",
+                        errors="surrogateescape",
                     )
-                    self._buffer = self._buffer[end_idx:]
-                    return self._buffer
+                    assert self._bin_buf.startswith(consumed_bytes)
+                    logger.debug(
+                        f"serial[{self.port}]: found expected message {len(consumed_bytes)} bytes, {len(self._bin_buf) - len(consumed_bytes)} bytes remaning"
+                    )
+                    self._str_buf = buffer[end_idx:]
+                    self._bin_buf = self._bin_buf[len(consumed_bytes) :]
+                    return consumed_chars
 
             remaining_time = end_timestamp - time.monotonic()
             if remaining_time <= 0:
                 if pattern_re is not None:
+                    s = self._bin_buf.decode("utf-8", errors="surrogateescape")
                     logger.debug(
-                        f"serial[{self.port}]: did not find expected message {repr(pattern)} (buffer content is {repr(self._buffer)})"
+                        f"serial[{self.port}]: did not find expected message {repr(pattern)} (buffer content is {repr(s)})"
                     )
                     raise RuntimeError(
-                        f"Did not receive expected message {repr(pattern)} within timeout (buffer content is {repr(self._buffer)})"
+                        f"Did not receive expected message {repr(pattern)} within timeout (buffer content is {repr(s)})"
                     )
-                return self._buffer
+                return None
             _, _, _ = select.select([self._ser], [], [], remaining_time)
 
     def __enter__(self) -> "Serial":
