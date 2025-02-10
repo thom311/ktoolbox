@@ -708,6 +708,7 @@ class Host(ABC):
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
         start: bool = True,
+        add_to_thread_list: bool = False,
     ) -> FutureThread[Result]: ...
 
     @typing.overload
@@ -730,6 +731,7 @@ class Host(ABC):
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
         start: bool = True,
+        add_to_thread_list: bool = False,
     ) -> FutureThread[BinResult]: ...
 
     @typing.overload
@@ -754,6 +756,7 @@ class Host(ABC):
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
         start: bool = True,
+        add_to_thread_list: bool = False,
     ) -> Union[FutureThread[Result], FutureThread[BinResult]]: ...
 
     def run_in_thread(
@@ -777,6 +780,7 @@ class Host(ABC):
         cancellable: Optional[common.Cancellable] = None,
         line_callback: Optional[Callable[[bool, bytes], None]] = None,
         start: bool = True,
+        add_to_thread_list: bool = False,
     ) -> Union[FutureThread[Result], FutureThread[BinResult]]:
 
         if not isinstance(cmd, str):
@@ -804,6 +808,9 @@ class Host(ABC):
             cancellable=cancellable,
             start=start,
         )
+
+        if add_to_thread_list:
+            common.thread_list_add(thread)
 
         return typing.cast(
             Union[FutureThread[Result], FutureThread[BinResult]],
