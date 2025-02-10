@@ -273,6 +273,12 @@ class Result(BaseResult[str]):
 
     CANCELLED: typing.ClassVar["Result"]
 
+    def _maybe_intern(self) -> "Result":
+        if self.cancelled and self == Result.CANCELLED:
+            assert self is not Result.CANCELLED
+            return self.CANCELLED
+        return self
+
 
 @dataclass(frozen=True)
 class BinResult(BaseResult[bytes]):
@@ -310,6 +316,11 @@ class BinResult(BaseResult[bytes]):
         )
 
     CANCELLED: typing.ClassVar["BinResult"]
+
+    def _maybe_intern(self) -> "BinResult":
+        if self.cancelled and self == BinResult.CANCELLED:
+            return self.CANCELLED
+        return self
 
 
 BinResult.CANCELLED = BinResult.new_internal(
@@ -660,8 +671,8 @@ class Host(ABC):
             sys.exit(common.FATAL_EXIT_CODE)
 
         if str_result is not None:
-            return str_result
-        return bin_result
+            return str_result._maybe_intern()
+        return bin_result._maybe_intern()
 
     @abstractmethod
     def _run(
