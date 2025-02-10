@@ -2081,6 +2081,7 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         *,
         start: bool = False,
         cancellable: Optional[Cancellable] = None,
+        user_data: Any = None,
     ):
         super().__init__()
         self._lock = threading.Lock()
@@ -2088,7 +2089,8 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         self.future: Future[T1] = Future()
         self._cancellable = cancellable
         self._cancellable_is_cancelled = False
-        self._user_data: Any = None
+        self._user_data = user_data
+        self._is_started = False
         if start:
             self.start()
 
@@ -2112,6 +2114,28 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
             self._user_data = data
             return old
 
+    @property
+    def is_started(self) -> bool:
+        with self._lock:
+            return self._is_started
+
+    def start(self) -> None:
+        with self._lock:
+            self._is_started = True
+        super().start()
+
+    def ensure_started(self, *, start: bool = True) -> None:
+        if not start:
+            return
+        with self._lock:
+            if self._is_started:
+                return
+            self._is_started = True
+        try:
+            super().start()
+        except RuntimeError:
+            return
+
     def run(self) -> None:
         try:
             result = self._func(self)
@@ -2119,14 +2143,33 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         except BaseException as e:
             self.future.set_exception(e)
 
-    def join_and_result(self, *, cancel: bool = False) -> T1:
+    def _maybe_cancel(self, *, cancel: bool = True) -> None:
         if cancel:
             with self._lock:
                 if self._cancellable is not None:
                     self._cancellable.cancel()
                 else:
                     self._cancellable_is_cancelled = True
-        self.join()
+
+    def poll(
+        self,
+        *,
+        timeout: float = 0.0,
+        cancel: bool = False,
+    ) -> Optional[T1]:
+        self._maybe_cancel(cancel=cancel)
+        if not self.is_started:
+            # poll() accepts calls on a not yet started thread. Unlike
+            # join_and_result().
+            return None
+        self.join(timeout=timeout)
+        if self.is_alive():
+            return None
+        return self.future.result()
+
+    def join_and_result(self, *, cancel: bool = False) -> T1:
+        self._maybe_cancel(cancel=cancel)
+        self.join(timeout=None)
         return self.future.result()
 
 
