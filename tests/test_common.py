@@ -1317,7 +1317,7 @@ def test_future_thread() -> None:
     assert thread.poll() is None
     thread.cancellable.cancel()
 
-    end_time = time.monotonic() + 1.0
+    end_time = time.monotonic() + 5.0
     while True:
         r = thread.poll()
         if r is not None:

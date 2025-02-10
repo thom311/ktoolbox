@@ -846,3 +846,36 @@ def test_file_remove_remote_2(tmp_path: pathlib.Path) -> None:
     user, rsh = skip_without_ssh_nopass(sudo=True)
     skip_without_sudo(rsh)
     _test_file_remove(rsh, tmp_path)
+
+
+def test_run_in_thread() -> None:
+
+    rsh = host.local
+
+    th = rsh.run_in_thread("echo hi")
+    assert th.is_started
+    assert th.join_and_result() == host.Result("hi\n", "", 0)
+
+    th = rsh.run_in_thread(
+        "echo foo >&2 ; exit 7",
+        start=False,
+        check_success=lambda r: r.returncode == 7,
+    )
+    assert not th.is_started
+    th.ensure_started()
+    assert th.is_started
+    th.ensure_started()
+    assert th.join_and_result() == host.Result("", "foo\n", 7, forced_success=True)
+
+    th2 = rsh.run_in_thread("echo hi; exit 6", text=False)
+    assert th2.join_and_result() == host.BinResult(b"hi\n", b"", 6)
+
+    th = rsh.run_in_thread("sleep 10000", start=False)
+    assert th.poll() is None
+    th.start()
+    assert th.poll() is None
+    th.cancellable.cancel()
+    r = th.join_and_result()
+    assert r == host.Result("", "", -15, cancelled=True) or r == host.Result.CANCELLED
+    assert r is th.poll()
+    assert r is th.join_and_result()
