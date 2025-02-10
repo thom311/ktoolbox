@@ -845,6 +845,10 @@ class LocalHost(Host):
                 assert stream is pr.stderr
                 is_stdout = False
             while True:
+                if read_all:
+                    to_read, _, _ = select.select([stream], [], [], 0)
+                    if not to_read:
+                        return
                 b = stream.readline()
                 if not b:
                     return
@@ -913,6 +917,7 @@ class LocalHost(Host):
             if pr.poll() is not None:
                 returncode = pr.returncode
                 break
+
         _readlines(pr.stdout, read_all=True)
         _readlines(pr.stderr, read_all=True)
 
