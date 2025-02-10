@@ -2176,18 +2176,26 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
 _thread_list: list[threading.Thread] = []
 
 
+def thread_list_get() -> list[threading.Thread]:
+    with common_lock:
+        return list(_thread_list)
+
+
 def thread_list_add(self: threading.Thread) -> None:
     with common_lock:
         _thread_list.append(self)
 
 
-def thread_list_join_all() -> None:
+def thread_list_join_all(cancel: bool = True) -> None:
     while True:
         with common_lock:
             if not _thread_list:
                 return
             th = _thread_list.pop(0)
-        th.join()
+        if isinstance(th, FutureThread):
+            th.join_and_result(cancel=cancel)
+        else:
+            th.join()
 
 
 @functools.cache
