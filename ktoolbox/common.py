@@ -2173,6 +2173,23 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         return self.future.result()
 
 
+_thread_list: list[threading.Thread] = []
+
+
+def thread_list_add(self: threading.Thread) -> None:
+    with common_lock:
+        _thread_list.append(self)
+
+
+def thread_list_join_all() -> None:
+    while True:
+        with common_lock:
+            if not _thread_list:
+                return
+            th = _thread_list.pop(0)
+        th.join()
+
+
 @functools.cache
 def get_current_host() -> str:
     chost = os.environ.get("KTOOLBOX_CURRENT_HOST")
