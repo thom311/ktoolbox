@@ -8,6 +8,7 @@ import pytest
 import random
 import re
 import sys
+import time
 import typing
 
 from collections.abc import Iterable
@@ -1308,6 +1309,31 @@ def test_structparse_pop_objlist_as_dict() -> None:
 def test_future_thread() -> None:
     thread = common.FutureThread(lambda th: host.local.run("echo hi"), start=True)
     assert thread.join_and_result() == host.Result("hi\n", "", 0)
+
+    thread = common.FutureThread(
+        lambda th: host.local.run("sleep 10000", cancellable=th.cancellable),
+        start=True,
+    )
+    assert thread.poll() is None
+    thread.cancellable.cancel()
+
+    end_time = time.monotonic() + 5.0
+    while True:
+        r = thread.poll()
+        if r is not None:
+            assert (
+                r
+                == host.Result(
+                    out="",
+                    err="",
+                    returncode=-15,
+                    cancelled=True,
+                )
+                or r == host.Result.CANCELLED
+            )
+            assert r is thread.join_and_result()
+            break
+        assert time.monotonic() < end_time
 
 
 def test_path_norm() -> None:

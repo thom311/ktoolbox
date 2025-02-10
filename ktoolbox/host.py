@@ -24,6 +24,8 @@ from typing import Union
 
 from . import common
 
+from .common import FutureThread
+
 
 INTERNAL_ERROR_PREFIX = "Host.run(): "
 
@@ -271,6 +273,12 @@ class Result(BaseResult[str]):
 
     CANCELLED: typing.ClassVar["Result"]
 
+    def _maybe_intern(self) -> "Result":
+        if self.cancelled and self == Result.CANCELLED:
+            assert self is not Result.CANCELLED
+            return self.CANCELLED
+        return self
+
 
 @dataclass(frozen=True)
 class BinResult(BaseResult[bytes]):
@@ -308,6 +316,11 @@ class BinResult(BaseResult[bytes]):
         )
 
     CANCELLED: typing.ClassVar["BinResult"]
+
+    def _maybe_intern(self) -> "BinResult":
+        if self.cancelled and self == BinResult.CANCELLED:
+            return self.CANCELLED
+        return self
 
 
 BinResult.CANCELLED = BinResult.new_internal(
@@ -658,8 +671,8 @@ class Host(ABC):
             sys.exit(common.FATAL_EXIT_CODE)
 
         if str_result is not None:
-            return str_result
-        return bin_result
+            return str_result._maybe_intern()
+        return bin_result._maybe_intern()
 
     @abstractmethod
     def _run(
@@ -674,6 +687,128 @@ class Host(ABC):
         cancellable: Optional[common.Cancellable],
     ) -> BinResult:
         pass
+
+    @typing.overload
+    def run_in_thread(
+        self,
+        cmd: Union[str, Iterable[str]],
+        *,
+        text: typing.Literal[True] = True,
+        env: Optional[Mapping[str, Optional[str]]] = None,
+        sudo: Optional[bool] = None,
+        cwd: Optional[str] = None,
+        log_prefix: str = "",
+        log_level: Optional[int] = None,
+        log_level_result: Optional[int] = None,
+        log_level_fail: Optional[int] = None,
+        log_lineoutput: Union[bool, int] = False,
+        check_success: Optional[Callable[[Result], bool]] = None,
+        die_on_error: bool = False,
+        decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
+        start: bool = True,
+    ) -> FutureThread[Result]: ...
+
+    @typing.overload
+    def run_in_thread(
+        self,
+        cmd: Union[str, Iterable[str]],
+        *,
+        text: typing.Literal[False],
+        env: Optional[Mapping[str, Optional[str]]] = None,
+        sudo: Optional[bool] = None,
+        cwd: Optional[str] = None,
+        log_prefix: str = "",
+        log_level: Optional[int] = None,
+        log_level_result: Optional[int] = None,
+        log_level_fail: Optional[int] = None,
+        log_lineoutput: Union[bool, int] = False,
+        check_success: Optional[Callable[[BinResult], bool]] = None,
+        die_on_error: bool = False,
+        decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
+        start: bool = True,
+    ) -> FutureThread[BinResult]: ...
+
+    @typing.overload
+    def run_in_thread(
+        self,
+        cmd: Union[str, Iterable[str]],
+        *,
+        text: bool = True,
+        env: Optional[Mapping[str, Optional[str]]] = None,
+        sudo: Optional[bool] = None,
+        cwd: Optional[str] = None,
+        log_prefix: str = "",
+        log_level: Optional[int] = None,
+        log_level_result: Optional[int] = None,
+        log_level_fail: Optional[int] = None,
+        log_lineoutput: Union[bool, int] = False,
+        check_success: Optional[
+            Union[Callable[[Result], bool], Callable[[BinResult], bool]]
+        ] = None,
+        die_on_error: bool = False,
+        decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
+        start: bool = True,
+    ) -> Union[FutureThread[Result], FutureThread[BinResult]]: ...
+
+    def run_in_thread(
+        self,
+        cmd: Union[str, Iterable[str]],
+        *,
+        text: bool = True,
+        env: Optional[Mapping[str, Optional[str]]] = None,
+        sudo: Optional[bool] = None,
+        cwd: Optional[str] = None,
+        log_prefix: str = "",
+        log_level: Optional[int] = None,
+        log_level_result: Optional[int] = None,
+        log_level_fail: Optional[int] = None,
+        log_lineoutput: Union[bool, int] = False,
+        check_success: Optional[
+            Union[Callable[[Result], bool], Callable[[BinResult], bool]]
+        ] = None,
+        die_on_error: bool = False,
+        decode_errors: Optional[str] = None,
+        cancellable: Optional[common.Cancellable] = None,
+        line_callback: Optional[Callable[[bool, bytes], None]] = None,
+        start: bool = True,
+    ) -> Union[FutureThread[Result], FutureThread[BinResult]]:
+
+        if not isinstance(cmd, str):
+            cmd = list(cmd)
+        if env is not None:
+            env = dict(env)
+
+        thread = FutureThread(
+            lambda th: self.run(
+                cmd,
+                text=text,
+                env=env,
+                sudo=sudo,
+                cwd=cwd,
+                log_prefix=log_prefix,
+                log_level=log_level,
+                log_level_result=log_level_result,
+                log_level_fail=log_level_fail,
+                log_lineoutput=log_lineoutput,
+                check_success=check_success,
+                die_on_error=die_on_error,
+                cancellable=th.cancellable,
+                line_callback=line_callback,
+            ),
+            cancellable=cancellable,
+            start=start,
+        )
+
+        return typing.cast(
+            Union[FutureThread[Result], FutureThread[BinResult]],
+            thread,
+        )
 
     def get_effective_sudo(self, sudo: Optional[bool] = None) -> bool:
         if sudo is None:
@@ -845,6 +980,10 @@ class LocalHost(Host):
                 assert stream is pr.stderr
                 is_stdout = False
             while True:
+                if read_all:
+                    to_read, _, _ = select.select([stream], [], [], 0)
+                    if not to_read:
+                        return
                 b = stream.readline()
                 if not b:
                     return
@@ -913,6 +1052,7 @@ class LocalHost(Host):
             if pr.poll() is not None:
                 returncode = pr.returncode
                 break
+
         _readlines(pr.stdout, read_all=True)
         _readlines(pr.stderr, read_all=True)
 
