@@ -848,9 +848,7 @@ def test_file_remove_remote_2(tmp_path: pathlib.Path) -> None:
     _test_file_remove(rsh, tmp_path)
 
 
-def test_run_in_thread() -> None:
-
-    rsh = host.local
+def _test_run_in_thread(rsh: host.Host) -> None:
 
     th = rsh.run_in_thread("echo hi")
     assert th.is_started
@@ -876,6 +874,21 @@ def test_run_in_thread() -> None:
     assert th.poll() is None
     th.cancellable.cancel()
     r = th.join_and_result()
-    assert r == host.Result("", "", -15, cancelled=True) or r == host.Result.CANCELLED
+    if r == host.Result.CANCELLED:
+        pass
+    else:
+        if isinstance(rsh, host.LocalHost):
+            assert r == host.Result("", "", -15, cancelled=True)
+        else:
+            assert r == host.Result("", "", -1, cancelled=True)
     assert r is th.poll()
     assert r is th.join_and_result()
+
+
+def test_run_in_thread_local() -> None:
+    _test_run_in_thread(host.local)
+
+
+def test_run_in_thread_ssh() -> None:
+    user, rsh = skip_without_ssh_nopass(sudo=True)
+    _test_run_in_thread(rsh)
