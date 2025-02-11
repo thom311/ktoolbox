@@ -1336,13 +1336,17 @@ class RemoteHost(Host):
 
             try_count += 1
 
-            if time.monotonic() >= end_timestamp:
+            now = time.monotonic()
+
+            if now >= end_timestamp:
                 if handle_log is not None:
                     handle_log(
                         logging.DEBUG,
                         f"remote[{self.pretty_str()}]: failed to login with credentials {self.logins} ({try_count} tries)",
                     )
                 return None, False
+
+            time.sleep(min(1.0, end_timestamp - now))
 
     def _run(
         self,
