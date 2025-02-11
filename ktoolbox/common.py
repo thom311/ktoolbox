@@ -1790,12 +1790,18 @@ class Serial:
 def _log_parse_level_str(lvl: str) -> Optional[int]:
     lvl2 = lvl.lower().strip()
     if lvl2:
+        DISABLED = logging.FATAL + 10
         log_levels = {
             "debug": logging.DEBUG,
             "info": logging.INFO,
             "warning": logging.WARNING,
+            "warn": logging.WARN,
             "error": logging.ERROR,
             "critical": logging.CRITICAL,
+            "fatal": logging.FATAL,
+            "off": DISABLED,
+            "none": DISABLED,
+            "disabled": DISABLED,
         }
         if lvl2 in log_levels:
             return log_levels[lvl2]
