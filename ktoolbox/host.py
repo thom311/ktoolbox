@@ -1317,19 +1317,17 @@ class RemoteHost(Host):
                 else:
                     common.unwrap(client.get_transport()).set_keepalive(1)
                     tlocal.login = login
-                    if handle_log is not None:
-                        handle_log(
-                            logging.DEBUG,
-                            f"remote[{self.pretty_str()}]: successfully logged in to {login}",
-                        )
+                    handle_log(
+                        logging.DEBUG,
+                        f"remote[{self.pretty_str()}]: successfully logged in to {login}",
+                    )
                     return client, True
 
                 if try_count == 0:
-                    if handle_log is not None:
-                        handle_log(
-                            logging.DEBUG,
-                            f"remote[{self.pretty_str()}]: failed to login to {login}: {error}",
-                        )
+                    handle_log(
+                        logging.DEBUG,
+                        f"remote[{self.pretty_str()}]: failed to login to {login}: {error}",
+                    )
 
                 if common.Cancellable.is_cancelled(cancellable):
                     return None, False
@@ -1339,11 +1337,10 @@ class RemoteHost(Host):
             now = time.monotonic()
 
             if now >= end_timestamp:
-                if handle_log is not None:
-                    handle_log(
-                        logging.DEBUG,
-                        f"remote[{self.pretty_str()}]: failed to login with credentials {self.logins} ({try_count} tries)",
-                    )
+                handle_log(
+                    logging.DEBUG,
+                    f"remote[{self.pretty_str()}]: failed to login with credentials {self.logins} ({try_count} tries)",
+                )
                 return None, False
 
             time.sleep(min(1.0, end_timestamp - now))
