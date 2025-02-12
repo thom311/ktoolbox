@@ -1267,11 +1267,18 @@ class RemoteHost(Host):
 
     def _get_client(
         self,
+        *,
+        force_new: bool = False,
     ) -> tuple[threading.local, "paramiko.SSHClient", Optional[_Login]]:
         tlocal = self._tlocal
         client = getattr(tlocal, "client", None)
         login: Optional[_Login] = None
-        if client is None:
+        if client is None or force_new:
+            if client is not None:
+                try:
+                    client.close()
+                except Exception:
+                    pass
             client = self._paramiko.SSHClient()
             client.set_missing_host_key_policy(self._paramiko.AutoAddPolicy())
             tlocal.client = client
@@ -1311,6 +1318,9 @@ class RemoteHost(Host):
         while True:
             if common.Cancellable.is_cancelled(cancellable):
                 return None, False
+
+            if try_count > 0:
+                tlocal, client, login = self._get_client(force_new=True)
 
             for login in self.logins:
                 try:
