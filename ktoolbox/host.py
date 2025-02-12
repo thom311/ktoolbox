@@ -1309,6 +1309,9 @@ class RemoteHost(Host):
         try_count = 0
 
         while True:
+            if common.Cancellable.is_cancelled(cancellable):
+                return None, False
+
             for login in self.logins:
                 try:
                     login._login(client, self.host)
@@ -1372,9 +1375,9 @@ class RemoteHost(Host):
                 handle_log=handle_log,
                 cancellable=cancellable,
             )
+            if common.Cancellable.is_cancelled(cancellable):
+                return BinResult.CANCELLED
             if client is None:
-                if common.Cancellable.is_cancelled(cancellable):
-                    return BinResult.CANCELLED
                 return BinResult.new_internal(
                     f"failed to login to remote host {self.host}"
                 )
