@@ -26,6 +26,8 @@ from ktoolbox.common import serialize_enum
 from ktoolbox.common import StructParsePopContext
 from ktoolbox.common import StructParseParseContext
 
+import tstutil
+
 
 class ReachedError(Exception):
     pass
@@ -1307,33 +1309,41 @@ def test_structparse_pop_objlist_as_dict() -> None:
 
 
 def test_future_thread() -> None:
-    thread = common.FutureThread(lambda th: host.local.run("echo hi"), start=True)
-    assert thread.join_and_result() == host.Result("hi\n", "", 0)
 
-    thread = common.FutureThread(
-        lambda th: host.local.run("sleep 10000", cancellable=th.cancellable),
-        start=True,
-    )
-    assert thread.poll() is None
-    thread.cancellable.cancel()
+    with tstutil.maybe_thread_pool_executor() as executor:
+        thread = common.FutureThread(
+            lambda th: host.local.run("echo hi"),
+            start=True,
+            executor=executor,
+        )
+        assert thread.result() == host.Result("hi\n", "", 0)
 
-    end_time = time.monotonic() + 5.0
-    while True:
-        r = thread.poll()
-        if r is not None:
-            assert (
-                r
-                == host.Result(
-                    out="",
-                    err="",
-                    returncode=-15,
-                    cancelled=True,
+    with tstutil.maybe_thread_pool_executor() as executor:
+        thread = common.FutureThread(
+            lambda th: host.local.run("sleep 10000", cancellable=th.cancellable),
+            start=True,
+            executor=executor,
+        )
+        assert thread.poll() is None
+        thread.cancellable.cancel()
+
+        end_time = time.monotonic() + 5.0
+        while True:
+            r = thread.poll()
+            if r is not None:
+                assert (
+                    r
+                    == host.Result(
+                        out="",
+                        err="",
+                        returncode=-15,
+                        cancelled=True,
+                    )
+                    or r == host.Result.CANCELLED
                 )
-                or r == host.Result.CANCELLED
-            )
-            assert r is thread.join_and_result()
-            break
-        assert time.monotonic() < end_time
+                assert r is thread.result()
+                break
+            assert time.monotonic() < end_time
 
 
 def test_path_norm() -> None:

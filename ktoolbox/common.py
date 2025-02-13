@@ -1,4 +1,5 @@
 import abc
+import concurrent.futures
 import contextlib
 import dataclasses
 import functools
@@ -2101,7 +2102,7 @@ class Cancellable:
             return self._read_fd
 
 
-class FutureThread(threading.Thread, typing.Generic[T1]):
+class FutureThread(typing.Generic[T1]):
     def __init__(
         self,
         func: typing.Callable[["FutureThread[T1]"], T1],
@@ -2109,8 +2110,8 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         start: bool = False,
         cancellable: Optional[Cancellable] = None,
         user_data: Any = None,
+        executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
     ):
-        super().__init__()
         self._lock = threading.Lock()
         self._func = func
         self.future: Future[T1] = Future()
@@ -2118,6 +2119,8 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         self._cancellable_is_cancelled = False
         self._user_data = user_data
         self._is_started = False
+        self._executor = executor
+        self._thread: Optional[threading.Thread] = None
         if start:
             self.start()
 
@@ -2146,37 +2149,71 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         with self._lock:
             return self._is_started
 
-    def start(self) -> None:
-        with self._lock:
-            self._is_started = True
-        super().start()
-
-    def ensure_started(self, *, start: bool = True) -> None:
-        if not start:
-            return
+    def start(self) -> bool:
         with self._lock:
             if self._is_started:
-                return
+                return False
             self._is_started = True
-        try:
-            super().start()
-        except RuntimeError:
-            return
+            if self._executor is not None:
+                self._executor.submit(self._run_task)
+            else:
+                self._thread = threading.Thread(target=self._run_task)
+                self._thread.start()
+        return True
 
-    def run(self) -> None:
+    def ensure_started(self, *, start: bool = True) -> None:
+        if start:
+            self.start()
+
+    def _run_task(self) -> None:
         try:
             result = self._func(self)
             self.future.set_result(result)
         except BaseException as e:
             self.future.set_exception(e)
 
-    def _maybe_cancel(self, *, cancel: bool = True) -> None:
-        if cancel:
-            with self._lock:
+    @typing.overload
+    def result(
+        self,
+        *,
+        timeout: typing.Literal[None] = None,
+        cancel: bool = False,
+    ) -> T1: ...
+
+    @typing.overload
+    def result(
+        self,
+        *,
+        timeout: Optional[float],
+        cancel: bool = False,
+    ) -> Optional[T1]: ...
+
+    def result(
+        self,
+        *,
+        timeout: Optional[float] = None,
+        cancel: bool = False,
+    ) -> Optional[T1]:
+        with self._lock:
+            if not self._is_started:
+                raise RuntimeError("thread is not yet started")
+            if cancel:
                 if self._cancellable is not None:
                     self._cancellable.cancel()
                 else:
                     self._cancellable_is_cancelled = True
+            thread = self._thread
+        if self._executor is not None:
+            try:
+                return self.future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                return None
+        else:
+            assert thread is not None
+            thread.join(timeout=timeout)
+            if thread.is_alive():
+                return None
+            return self.future.result()
 
     def poll(
         self,
@@ -2184,31 +2221,31 @@ class FutureThread(threading.Thread, typing.Generic[T1]):
         timeout: float = 0.0,
         cancel: bool = False,
     ) -> Optional[T1]:
-        self._maybe_cancel(cancel=cancel)
-        if not self.is_started:
-            # poll() accepts calls on a not yet started thread. Unlike
-            # join_and_result().
-            return None
-        self.join(timeout=timeout)
-        if self.is_alive():
-            return None
-        return self.future.result()
+        return self.result(
+            timeout=timeout,
+            cancel=cancel,
+        )
+
+    def join(
+        self,
+        *,
+        timeout: Optional[float] = None,
+    ) -> None:
+        self.result(timeout=timeout)
 
     def join_and_result(self, *, cancel: bool = False) -> T1:
-        self._maybe_cancel(cancel=cancel)
-        self.join(timeout=None)
-        return self.future.result()
+        return self.result(cancel=cancel)
 
 
-_thread_list: list[threading.Thread] = []
+_thread_list: list[Union[threading.Thread, FutureThread[Any]]] = []
 
 
-def thread_list_get() -> list[threading.Thread]:
+def thread_list_get() -> list[Union[threading.Thread, FutureThread[Any]]]:
     with common_lock:
         return list(_thread_list)
 
 
-def thread_list_add(self: threading.Thread) -> None:
+def thread_list_add(self: Union[threading.Thread, FutureThread[Any]]) -> None:
     with common_lock:
         _thread_list.append(self)
 
@@ -2220,7 +2257,7 @@ def thread_list_join_all(cancel: bool = True) -> None:
                 return
             th = _thread_list.pop(0)
         if isinstance(th, FutureThread):
-            th.join_and_result(cancel=cancel)
+            th.result(cancel=cancel)
         else:
             th.join()
 
