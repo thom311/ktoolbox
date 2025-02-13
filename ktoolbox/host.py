@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import typing
+import concurrent.futures
 
 from abc import ABC
 from abc import abstractmethod
@@ -710,6 +711,7 @@ class Host(ABC):
         start: bool = True,
         add_to_thread_list: bool = False,
         user_data: Any = None,
+        executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
     ) -> FutureThread[Result]: ...
 
     @typing.overload
@@ -734,6 +736,7 @@ class Host(ABC):
         start: bool = True,
         add_to_thread_list: bool = False,
         user_data: Any = None,
+        executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
     ) -> FutureThread[BinResult]: ...
 
     @typing.overload
@@ -760,6 +763,7 @@ class Host(ABC):
         start: bool = True,
         add_to_thread_list: bool = False,
         user_data: Any = None,
+        executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
     ) -> Union[FutureThread[Result], FutureThread[BinResult]]: ...
 
     def run_in_thread(
@@ -785,6 +789,7 @@ class Host(ABC):
         start: bool = True,
         add_to_thread_list: bool = False,
         user_data: Any = None,
+        executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
     ) -> Union[FutureThread[Result], FutureThread[BinResult]]:
 
         if not isinstance(cmd, str):
@@ -812,6 +817,7 @@ class Host(ABC):
             cancellable=cancellable,
             start=start,
             user_data=user_data,
+            executor=executor,
         )
 
         if add_to_thread_list:

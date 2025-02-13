@@ -17,6 +17,8 @@ from typing import Union
 from ktoolbox import common
 from ktoolbox import host
 
+import tstutil
+
 
 common.log_config_logger(logging.DEBUG, "ktoolbox")
 
@@ -515,7 +517,7 @@ def _test_cancellable(rsh: host.Host) -> None:
 
         thread = common.FutureThread(_run, start=True)
         rnd_sleep(0.2)
-        res = thread.join_and_result(cancel=True)
+        res = thread.result(cancel=True)
         if res != host.Result.CANCELLED:
             if isinstance(rsh, host.RemoteHost):
                 assert res == host.Result("", "", -1, cancelled=True)
@@ -581,7 +583,7 @@ def test_cancellable_remote_2() -> None:
         ),
         start=True,
     )
-    res = thread.join_and_result()
+    res = thread.result()
     assert res == host.Result("foo\n", "", -1, cancelled=True)
 
 
@@ -618,7 +620,7 @@ def _test_cancellable_1(rsh: host.Host) -> None:
         ),
         start=True,
     )
-    res = thread.join_and_result()
+    res = thread.result()
     assert res == host.Result(
         "/tmp\nroot\n>foo<\ndone\n",
         "",
@@ -850,30 +852,41 @@ def test_file_remove_remote_2(tmp_path: pathlib.Path) -> None:
 
 def _test_run_in_thread(rsh: host.Host) -> None:
 
-    th = rsh.run_in_thread("echo hi")
-    assert th.is_started
-    assert th.join_and_result() == host.Result("hi\n", "", 0)
+    with tstutil.maybe_thread_pool_executor() as executor:
 
-    th = rsh.run_in_thread(
-        "echo foo >&2 ; exit 7",
-        start=False,
-        check_success=lambda r: r.returncode == 7,
-    )
-    assert not th.is_started
-    th.ensure_started()
-    assert th.is_started
-    th.ensure_started()
-    assert th.join_and_result() == host.Result("", "foo\n", 7, forced_success=True)
+        th = rsh.run_in_thread("echo hi", executor=executor)
+        assert th.is_started
+        assert th.result() == host.Result("hi\n", "", 0)
 
-    th2 = rsh.run_in_thread("echo hi; exit 6", text=False)
-    assert th2.join_and_result() == host.BinResult(b"hi\n", b"", 6)
+    with tstutil.maybe_thread_pool_executor() as executor:
+        th = rsh.run_in_thread(
+            "echo foo >&2 ; exit 7",
+            start=False,
+            check_success=lambda r: r.returncode == 7,
+            executor=executor,
+        )
+        assert not th.is_started
+        th.start()
+        assert th.is_started
+        th.start()
+        assert th.result() == host.Result("", "foo\n", 7, forced_success=True)
 
-    th = rsh.run_in_thread("sleep 10000", start=False)
-    assert th.poll() is None
-    th.start()
-    assert th.poll() is None
-    th.cancellable.cancel()
-    r = th.join_and_result()
+    with tstutil.maybe_thread_pool_executor() as executor:
+        th2 = rsh.run_in_thread(
+            "echo hi; exit 6",
+            text=False,
+            executor=executor,
+        )
+        assert th2.result() == host.BinResult(b"hi\n", b"", 6)
+
+    with tstutil.maybe_thread_pool_executor() as executor:
+        th = rsh.run_in_thread("sleep 10000", start=False, executor=executor)
+        with pytest.raises(RuntimeError):
+            th.poll()
+        th.start()
+        assert th.poll() is None
+        th.cancellable.cancel()
+        r = th.result()
     if r == host.Result.CANCELLED:
         pass
     else:
@@ -882,7 +895,7 @@ def _test_run_in_thread(rsh: host.Host) -> None:
         else:
             assert r == host.Result("", "", -1, cancelled=True)
     assert r is th.poll()
-    assert r is th.join_and_result()
+    assert r is th.result()
 
 
 def test_run_in_thread_local() -> None:
