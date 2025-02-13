@@ -1717,6 +1717,27 @@ class Serial:
                 # The read data was appended to the internal self._bin_buf.
                 return byte_readcount
 
+    @typing.overload
+    def expect(
+        self,
+        pattern: Union[str, re.Pattern[str]],
+        timeout: float = 30,
+    ) -> str: ...
+
+    @typing.overload
+    def expect(
+        self,
+        pattern: None,
+        timeout: float = 30,
+    ) -> None: ...
+
+    @typing.overload
+    def expect(
+        self,
+        pattern: Union[None, str, re.Pattern[str]],
+        timeout: float = 30,
+    ) -> Optional[str]: ...
+
     def expect(
         self,
         pattern: Union[None, str, re.Pattern[str]],
