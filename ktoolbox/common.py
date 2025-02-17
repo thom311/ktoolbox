@@ -2262,12 +2262,30 @@ def thread_list_add(self: Union[threading.Thread, FutureThread[Any]]) -> None:
         _thread_list.append(self)
 
 
-def thread_list_join_all(cancel: bool = True) -> None:
+def thread_list_join_all(
+    *,
+    cancel: bool = True,
+    threads: Optional[Iterable[Union[threading.Thread, FutureThread[Any]]]] = None,
+) -> None:
+    if threads is not None and not isinstance(threads, list):
+        threads = list(threads)
+    lst_idx = 0
     while True:
-        with common_lock:
-            if not _thread_list:
+        if threads is not None:
+            if lst_idx >= len(threads):
                 return
-            th = _thread_list.pop(0)
+            th = threads[lst_idx]
+            lst_idx += 1
+        else:
+            # There is a difference between passing a "threads" argument and
+            # None.  Here we repeat the loop unil the thread list is empty. If
+            # a thread argument is provided, the list is evaluated once at the
+            # beginning.  That makes a difference if the list gets modified
+            # while calling join-all.
+            with common_lock:
+                if not _thread_list:
+                    return
+                th = _thread_list.pop(0)
         if isinstance(th, FutureThread):
             th.result(cancel=cancel)
         else:

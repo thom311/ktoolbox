@@ -8,6 +8,7 @@ import pytest
 import random
 import re
 import sys
+import threading
 import time
 import typing
 
@@ -1571,3 +1572,12 @@ def test_argparse_regex_type() -> None:
     with pytest.raises(SystemExit) as ex:
         parser.parse_args(["--pattern", "broken["])
     assert isinstance(ex.value, SystemExit)
+
+
+def test_thread_list() -> None:
+    lst = (host.local.run_in_thread("echo"),)
+    common.thread_list_join_all(threads=lst, cancel=True)
+    common.thread_list_join_all(threads=lst)
+
+    lst2: tuple[threading.Thread, ...] = ()
+    common.thread_list_join_all(threads=lst2)
