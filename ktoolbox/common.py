@@ -2133,6 +2133,18 @@ class FutureThread(typing.Generic[T1]):
                     self._cancellable.cancel()
             return self._cancellable
 
+    def _cancel_with_lock(
+        self,
+    ) -> None:
+        if self._cancellable is not None:
+            self._cancellable.cancel()
+        else:
+            self._cancellable_is_cancelled = True
+
+    def cancel(self) -> None:
+        with self._lock:
+            self._cancel_with_lock()
+
     @property
     def user_data(self) -> Any:
         with self._lock:
@@ -2198,10 +2210,7 @@ class FutureThread(typing.Generic[T1]):
             if not self._is_started:
                 raise RuntimeError("thread is not yet started")
             if cancel:
-                if self._cancellable is not None:
-                    self._cancellable.cancel()
-                else:
-                    self._cancellable_is_cancelled = True
+                self._cancel_with_lock()
             thread = self._thread
         if self._executor is not None:
             try:
