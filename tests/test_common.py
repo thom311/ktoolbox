@@ -1576,8 +1576,10 @@ def test_argparse_regex_type() -> None:
 
 def test_thread_list() -> None:
     lst = (host.local.run_in_thread("echo"),)
+    common.thread_list_cancel(threads=lst)
     common.thread_list_join_all(threads=lst, cancel=True)
     common.thread_list_join_all(threads=lst)
 
     lst2: tuple[threading.Thread, ...] = ()
+    common.thread_list_cancel(threads=lst2)
     common.thread_list_join_all(threads=lst2)

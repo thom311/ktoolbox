@@ -2262,6 +2262,19 @@ def thread_list_add(self: Union[threading.Thread, FutureThread[Any]]) -> None:
         _thread_list.append(self)
 
 
+def thread_list_cancel(
+    *,
+    threads: Optional[Iterable[Union[threading.Thread, FutureThread[Any]]]] = None,
+) -> None:
+    if threads is None:
+        threads = thread_list_get()
+    elif not isinstance(threads, list):
+        threads = list(threads)
+    for th in threads:
+        if isinstance(th, FutureThread):
+            th.cancel()
+
+
 def thread_list_join_all(
     *,
     cancel: bool = True,
