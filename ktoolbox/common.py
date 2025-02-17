@@ -2268,8 +2268,8 @@ def thread_list_cancel(
 ) -> None:
     if threads is None:
         threads = thread_list_get()
-    elif not isinstance(threads, list):
-        threads = list(threads)
+    else:
+        threads = iter_eval_now(threads)
     for th in threads:
         if isinstance(th, FutureThread):
             th.cancel()
@@ -2280,8 +2280,8 @@ def thread_list_join_all(
     cancel: bool = True,
     threads: Optional[Iterable[Union[threading.Thread, FutureThread[Any]]]] = None,
 ) -> None:
-    if threads is not None and not isinstance(threads, list):
-        threads = list(threads)
+    if threads is not None:
+        threads = iter_eval_now(threads)
     lst_idx = 0
     while True:
         if threads is not None:
