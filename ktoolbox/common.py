@@ -2126,6 +2126,9 @@ class FutureThread(typing.Generic[T1]):
 
     @property
     def cancellable(self) -> Cancellable:
+        return self.get_cancellable()
+
+    def get_cancellable(self) -> Cancellable:
         with self._lock:
             if self._cancellable is None:
                 self._cancellable = Cancellable()
