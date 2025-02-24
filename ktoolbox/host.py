@@ -190,8 +190,9 @@ class _BaseResult(ABC, typing.Generic[AnyStr]):
 
 @dataclass(frozen=True, **common.KW_ONLY_DATACLASS)
 class BaseResult(_BaseResult[AnyStr]):
-    # In most cases, "success" is the same as checking for returncode zero.  In
-    # some cases, it can be overwritten to be of a certain value.
+    # In most cases, "success" is the same as checking for returncode zero (see
+    # "plain_success" property). The "success" can be overwritten/forced with
+    # the "check_success()" callback.
     forced_success: Optional[bool] = dataclasses.field(
         default=None,
         # kw_only=True <- use once we upgrade to 3.10 and drop KW_ONLY_DATACLASS.
@@ -200,27 +201,40 @@ class BaseResult(_BaseResult[AnyStr]):
     cancelled: bool = False
 
     @property
-    def success(self) -> bool:
-        if self.forced_success is not None:
-            return self.forced_success
+    def plain_success(self) -> bool:
         if self.cancelled:
             return False
         return self.returncode == 0
+
+    @property
+    def success(self) -> bool:
+        if self.forced_success is not None:
+            return self.forced_success
+        return self.plain_success
 
     def __bool__(self) -> bool:
         return self.success
 
     def debug_str(self, *, with_output: bool = True) -> str:
-        if self.forced_success is None or self.forced_success == (self.returncode == 0):
-            if self.success:
-                status = "success"
-            else:
-                status = f"failed (exit {self.returncode})"
+        success = self.success
+        if self.forced_success is None or self.forced_success == self.plain_success:
+            forced = False
         else:
-            if self.forced_success:
-                status = f"success [forced] (exit {self.returncode})"
-            else:
-                status = "failed [forced] (exit 0)"
+            forced = True
+
+        if success:
+            status = "success"
+        else:
+            status = "failed"
+
+        if forced:
+            status += " [forced]"
+
+        if self.cancelled:
+            status += " [cancelled]"
+
+        if not success or self.returncode != 0:
+            status += f" (exit {self.returncode})"
 
         out = ""
         if self.out and with_output:
