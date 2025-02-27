@@ -1885,7 +1885,13 @@ else:
 class _LogHandler(_LogStreamHandler):
     def __init__(self, level: int):
         super().__init__()
-        fmt = "%(asctime)s.%(msecs)03d %(levelname)-7s [th:%(thread)s]: %(message)s"
+
+        if v := os.getenv("KTOOLBOX_LOGTAG"):
+            logtag = f"{v.replace('%', '%%')} "
+        else:
+            logtag = ""
+
+        fmt = f"%(asctime)s.%(msecs)03d %(levelname)-7s {logtag}[th:%(thread)s]: %(message)s"
         datefmt = "%Y-%m-%d %H:%M:%S"
         formatter = logging.Formatter(fmt, datefmt)
         self.setLevel(level)
