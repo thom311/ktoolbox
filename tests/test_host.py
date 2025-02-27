@@ -95,7 +95,7 @@ def _system(cmd: str) -> None:
 
 @functools.cache
 def get_user() -> Optional[str]:
-    return os.environ.get("USER")
+    return os.getenv("USER")
 
 
 @functools.cache

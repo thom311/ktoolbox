@@ -1222,7 +1222,7 @@ class RemoteHost(Host):
             for login in logins
         )
         if not logins2:
-            user = os.environ.get("USER")
+            user = os.getenv("USER")
             if not user:
                 raise ValueError("Unknown USER to login at RemoteHost()")
             logins2 = (AutoLogin(user),)

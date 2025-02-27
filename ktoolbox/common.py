@@ -2313,7 +2313,7 @@ def thread_list_join_all(
 
 @functools.cache
 def get_current_host() -> str:
-    chost = os.environ.get("KTOOLBOX_CURRENT_HOST")
+    chost = os.getenv("KTOOLBOX_CURRENT_HOST")
     if chost:
         return chost
 
