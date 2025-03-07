@@ -829,13 +829,15 @@ class Host(ABC):
                 line_callback=line_callback,
             ),
             cancellable=cancellable,
-            start=start,
+            start=False,
             user_data=user_data,
             executor=executor,
         )
 
         if add_to_thread_list:
-            common.thread_list_add(thread)
+            common.thread_list_add(thread, start=start)
+        elif start:
+            thread.start()
 
         return typing.cast(
             Union[FutureThread[Result], FutureThread[BinResult]],

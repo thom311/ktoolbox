@@ -854,9 +854,12 @@ def _test_run_in_thread(rsh: host.Host) -> None:
 
     with tstutil.maybe_thread_pool_executor() as executor:
 
-        th = rsh.run_in_thread("echo hi", executor=executor)
+        th = rsh.run_in_thread("echo hi", executor=executor, add_to_thread_list=True)
         assert th.is_started
+        assert common.thread_list_get() == [th]
         assert th.result() == host.Result("hi\n", "", 0)
+        common.thread_list_join_all()
+        assert common.thread_list_get() == []
 
     with tstutil.maybe_thread_pool_executor() as executor:
         th = rsh.run_in_thread(
@@ -880,13 +883,25 @@ def _test_run_in_thread(rsh: host.Host) -> None:
         assert th2.result() == host.BinResult(b"hi\n", b"", 6)
 
     with tstutil.maybe_thread_pool_executor() as executor:
-        th = rsh.run_in_thread("sleep 10000", start=False, executor=executor)
+        th = rsh.run_in_thread(
+            "sleep 10000",
+            start=False,
+            executor=executor,
+            add_to_thread_list=True,
+        )
+        assert common.thread_list_get() == [th]
+        assert not th.is_started
         with pytest.raises(RuntimeError):
             th.poll()
         th.start()
         assert th.poll() is None
-        th.cancellable.cancel()
+        if rnd_bool():
+            common.thread_list_join_all(cancel=True)
+        else:
+            th.cancellable.cancel()
         r = th.result()
+        common.thread_list_join_all()
+        assert common.thread_list_get() == []
     if r == host.Result.CANCELLED:
         pass
     else:

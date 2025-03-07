@@ -2263,9 +2263,21 @@ def thread_list_get() -> list[Union[threading.Thread, FutureThread[Any]]]:
         return list(_thread_list)
 
 
-def thread_list_add(self: Union[threading.Thread, FutureThread[Any]]) -> None:
+def thread_list_add(
+    self: Union[threading.Thread, FutureThread[Any]],
+    *,
+    start: bool = False,
+) -> None:
     with common_lock:
         _thread_list.append(self)
+        if start:
+            if isinstance(self, threading.Thread):
+                try:
+                    self.start()
+                except RuntimeError:
+                    pass
+            else:
+                self.start()
 
 
 def thread_list_cancel(
