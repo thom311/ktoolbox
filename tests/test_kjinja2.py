@@ -40,6 +40,16 @@ def test_render_data(tmp_path: pathlib.Path) -> None:
     assert _r("val: {{a|tojson}}", a="a") == 'val: "a"'
     assert _r("val: {{a|tojson}}", a="a b") == 'val: "a b"'
 
+    assert (
+        kjinja2.render_data("foo[{{x1}}][{{x2}}]", kwargs={"x1": "1"}, x2=2)
+        == "foo[1][2]"
+    )
+    assert (
+        kjinja2.render_data("foo[{{x1}}][{{x2}}]", {"x1": "1"}, x1="b", x2=2)
+        == "foo[b][2]"
+    )
+    assert kjinja2.render_data("foo{{xx}}{{x1}}", x="a", x1=0) == "foo0"
+
 
 def test_render_file() -> None:
     in_buffer = io.StringIO("val: {{a}}")

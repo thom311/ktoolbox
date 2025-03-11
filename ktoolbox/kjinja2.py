@@ -12,12 +12,19 @@ from . import common
 
 def render_data(
     contents: str,
-    kwargs: Mapping[str, Any],
+    kwargs: Optional[Mapping[str, Any]] = None,
     *,
     out_file: Optional[Union[str, pathlib.Path, typing.IO[str]]] = None,
+    **vargs: Any,
 ) -> str:
+    a: dict[str, Any] = {}
+    if kwargs is not None:
+        a.update(kwargs)
+    a.update(vargs)
+
     template = jinja2.Template(contents)
-    rendered = template.render(**kwargs)
+    rendered = template.render(**a)
+
     if out_file is not None:
         with common.use_or_open(out_file, mode="w") as outFile:
             outFile.write(rendered)
@@ -26,10 +33,16 @@ def render_data(
 
 def render_file(
     in_file: Union[str, pathlib.Path, typing.IO[str]],
-    kwargs: Mapping[str, Any],
+    kwargs: Optional[Mapping[str, Any]] = None,
     *,
     out_file: Optional[Union[str, pathlib.Path, typing.IO[str]]] = None,
+    **vargs: Any,
 ) -> str:
     with common.use_or_open(in_file) as inFile:
         contents = inFile.read()
-    return render_data(contents, kwargs, out_file=out_file)
+    return render_data(
+        contents,
+        kwargs,
+        out_file=out_file,
+        **vargs,
+    )
