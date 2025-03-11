@@ -1,5 +1,6 @@
 import io
 import pathlib
+import pytest
 
 from typing import Any
 
@@ -48,7 +49,12 @@ def test_render_data(tmp_path: pathlib.Path) -> None:
         kjinja2.render_data("foo[{{x1}}][{{x2}}]", {"x1": "1"}, x1="b", x2=2)
         == "foo[b][2]"
     )
-    assert kjinja2.render_data("foo{{xx}}{{x1}}", x="a", x1=0) == "foo0"
+    assert (
+        kjinja2.render_data("foo{{xx}}{{x1}}", x="a", x1=0, strict_undefined=False)
+        == "foo0"
+    )
+    with pytest.raises(Exception):
+        kjinja2.render_data("foo{{xx}}{{x1}}", x="a", x1=0)
 
 
 def test_render_file() -> None:

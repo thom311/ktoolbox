@@ -15,6 +15,7 @@ def render_data(
     kwargs: Optional[Mapping[str, Any]] = None,
     *,
     out_file: Optional[Union[str, pathlib.Path, typing.IO[str]]] = None,
+    strict_undefined: bool = True,
     **vargs: Any,
 ) -> str:
     a: dict[str, Any] = {}
@@ -22,7 +23,10 @@ def render_data(
         a.update(kwargs)
     a.update(vargs)
 
-    template = jinja2.Template(contents)
+    template = jinja2.Template(
+        contents,
+        undefined=jinja2.StrictUndefined if strict_undefined else jinja2.Undefined,
+    )
     rendered = template.render(**a)
 
     if out_file is not None:
@@ -36,6 +40,7 @@ def render_file(
     kwargs: Optional[Mapping[str, Any]] = None,
     *,
     out_file: Optional[Union[str, pathlib.Path, typing.IO[str]]] = None,
+    strict_undefined: bool = True,
     **vargs: Any,
 ) -> str:
     with common.use_or_open(in_file) as inFile:
@@ -44,5 +49,6 @@ def render_file(
         contents,
         kwargs,
         out_file=out_file,
+        strict_undefined=strict_undefined,
         **vargs,
     )
