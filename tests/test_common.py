@@ -125,6 +125,10 @@ def test_str_to_bool() -> None:
     assert common.bool_to_str(False, format="true") == "false"
     assert common.bool_to_str(True, format="yes") == "yes"
     assert common.bool_to_str(False, format="yes") == "no"
+    assert common.bool_to_str(True, format="1") == "1"
+    assert common.bool_to_str(False, format="1") == "0"
+    assert common.bool_to_str(True, format="on") == "on"
+    assert common.bool_to_str(False, format="on") == "off"
     with pytest.raises(ValueError):
         common.bool_to_str(False, format="bogus")
 

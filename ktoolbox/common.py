@@ -97,12 +97,20 @@ def char_is_surrogateescaped(char: str) -> bool:
     return 0xDC80 <= ord(char) <= 0xDCFF
 
 
+BOOL_TO_STR_FORMATS: Mapping[str, tuple[str, str]] = {
+    "true": ("true", "false"),
+    "yes": ("yes", "no"),
+    "1": ("1", "0"),
+    "on": ("on", "off"),
+}
+
+
 def bool_to_str(val: bool, *, format: str = "true") -> str:
-    if format == "true":
-        return "true" if val else "false"
-    if format == "yes":
-        return "yes" if val else "no"
-    raise ValueError(f'Invalid format "{format}"')
+    try:
+        fmt_tuple = BOOL_TO_STR_FORMATS[format]
+    except KeyError:
+        raise ValueError(f'Invalid format "{format}"')
+    return fmt_tuple[0] if val else fmt_tuple[1]
 
 
 def str_to_bool(
