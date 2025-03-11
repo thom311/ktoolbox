@@ -19,16 +19,11 @@ from ktoolbox import host
 
 import tstutil
 
+from tstutil import rnd_bool
+from tstutil import rnd_one_in
+
 
 common.log_config_logger(logging.DEBUG, "ktoolbox")
-
-
-def rnd_one_in(n: int) -> bool:
-    return random.randint(0, n - 1) == 0
-
-
-def rnd_bool() -> bool:
-    return rnd_one_in(2)
 
 
 def rnd_run_extraargs() -> dict[str, Any]:
