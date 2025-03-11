@@ -1,13 +1,34 @@
 import io
+import pathlib
 
 from typing import Any
 
 from ktoolbox import kjinja2
 
+import tstutil
 
-def test_render() -> None:
+
+def test_render_data(tmp_path: pathlib.Path) -> None:
     def _r(contents: str, **kwargs: Any) -> str:
-        return kjinja2.render_data(contents, kwargs)
+        filename = tmp_path / "outfile1"
+        out_file = tstutil.rnd_select(
+            None,
+            filename,
+            str(filename),
+            io.StringIO(),
+        )
+
+        rendered = kjinja2.render_data(contents, kwargs, out_file=out_file)
+
+        if out_file is not None:
+            if isinstance(out_file, io.StringIO):
+                out_file.seek(0)
+                re_read = out_file.read()
+            else:
+                with open(out_file) as f:
+                    re_read = f.read()
+            assert rendered == re_read
+        return rendered
 
     assert _r("", a="1") == ""
     assert _r("val: {{a}}", a=1) == "val: 1"
