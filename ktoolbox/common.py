@@ -779,8 +779,11 @@ def dataclass_from_json(cls: type[T], jsondata: str) -> T:
     return dataclass_from_dict(cls, data)
 
 
-def dataclass_from_file(cls: type[T], filename: Union[str, pathlib.Path]) -> T:
-    with open(filename) as f:
+def dataclass_from_file(
+    cls: type[T],
+    file: Union[str, pathlib.Path, typing.IO[str]],
+) -> T:
+    with use_or_open(file) as f:
         data = json.load(f)
     return dataclass_from_dict(cls, data)
 
