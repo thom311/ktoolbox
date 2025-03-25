@@ -429,6 +429,12 @@ def path_norm(
     return typing.cast(TPathNormPath, result)
 
 
+def path_basedir(filename: str) -> tuple[str, str]:
+    cwd = path_norm(".", cwd=os.getcwd())
+    basedir = path_norm(os.path.dirname(filename), cwd=cwd)
+    return cwd, basedir
+
+
 @contextlib.contextmanager
 def use_or_open(
     file: Union[str, pathlib.Path, typing.IO[str]],
