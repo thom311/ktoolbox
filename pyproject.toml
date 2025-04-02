@@ -31,6 +31,7 @@ pythonpath = [
 [tool.mypy]
 strict = true
 files = "."
+exclude = "build/"
 
 [[tool.mypy.overrides]]
 module = "serial"
