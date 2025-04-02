@@ -2364,3 +2364,29 @@ def argparse_regex_type(value: str) -> re.Pattern[str]:
         import argparse
 
         raise argparse.ArgumentTypeError(f"Invalid regex pattern: {e}")
+
+
+# Error codes from <sysexits.h>
+EX_SOFTWARE = 70
+EX_CONFIG = 78
+
+
+def run_main(
+    main_fcn: Union[
+        typing.Callable[[], None],
+        typing.Callable[[], int],
+        typing.Callable[[], Optional[int]],
+    ],
+    *,
+    error_code: int = EX_SOFTWARE,
+) -> typing.NoReturn:
+    try:
+        exit_code = main_fcn()
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(error_code)
+    if exit_code is None:
+        exit_code = 0
+    sys.exit(exit_code)
