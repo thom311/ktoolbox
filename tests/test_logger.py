@@ -1,5 +1,7 @@
 import logging
 import pytest
+import sys
+import typing
 
 from ktoolbox import common
 
@@ -11,6 +13,9 @@ def test_logger_1() -> None:
     assert isinstance(logger, common.ExtendedLogger)
     assert logger.name == name
     assert logger.wrapped_logger is logging.getLogger(name)
+
+    if sys.version_info >= (3, 11):
+        typing.assert_type(logger.wrapped_logger, logging.Logger)
 
     common.log_config_logger(logging.DEBUG, logger)
     assert logger.level == logging.DEBUG

@@ -1988,19 +1988,30 @@ def log_argparse_add_argument_verbosity(
 
 
 class ExtendedLogger(logging.Logger):
-    """A wrapper around a logger class with additional API
+    """A wrapper around the logging.Logger class with an extended API.
 
-    This is-a Logger, and it delegates almost everything to the intenal
-    logger instance. It implements a few convenience methods on top,
-    but it has no state of it's own. That means, as long as you call
-    API of the Logger base class, there is no difference between calling
-    an operation on the extended logger or the wrapped logger.
+    This class is a subclass of `logging.Logger`, and it delegates most functionality
+    to the internal logger instance. It adds a few convenience methods but does not
+    maintain any additional state. This means that, as long as the user interacts
+    with the standard `Logger` API, there is no observable difference between using
+    the `ExtendedLogger` or the wrapped `logging.Logger`.
+
+    The purpose of this wrapper is to allow users to access the same logger instance
+    whether they use `logging.getLogger(name)` or `ExtendedLogger(name)`. Since we
+    cannot modify the behavior of `logging.getLogger()` directly to return a custom
+    logging class, this wrapper allows us to offer extended functionality while
+    maintaining compatibility with the standard logging system.
+
+    Users of this `ExtendedLogger` can access the extended API while still interacting
+    with the underlying logger instance, ensuring seamless integration with the standard
+    logging framework.
     """
 
     def __init__(self, logger: Union[str, logging.Logger]):
         if isinstance(logger, str):
             logger = logging.getLogger(logger)
-        self.wrapped_logger = logger
+        object.__setattr__(self, "wrapped_logger", logger)
+        self.wrapped_logger: logging.Logger
 
     _EXTENDED_ATTRIBUTES = (
         "wrapped_logger",
@@ -2014,6 +2025,16 @@ class ExtendedLogger(logging.Logger):
             return object.__getattribute__(self, name)
         logger = object.__getattribute__(self, "wrapped_logger")
         return logger.__getattribute__(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in ExtendedLogger._EXTENDED_ATTRIBUTES:
+            raise AttributeError(f"{name} is read-only.")
+        setattr(self.wrapped_logger, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if name in ExtendedLogger._EXTENDED_ATTRIBUTES:
+            raise AttributeError(f"{name} is read-only.")
+        delattr(self.wrapped_logger, name)
 
     @typing.overload
     def error_and_exit(
