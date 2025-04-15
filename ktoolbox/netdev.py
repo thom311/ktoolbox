@@ -793,6 +793,31 @@ def get_uplink_representor(pciaddr: str) -> Optional[str]:
     return None
 
 
+def get_sysfs_pcivalues(pciaddr: str) -> Optional[dict[str, Any]]:
+    pciaddr = validate_pciaddr(pciaddr)
+
+    path = f"/sys/bus/pci/devices/{pciaddr}"
+    try:
+        files = os.listdir(path)
+    except Exception:
+        return None
+
+    result = {}
+
+    for file in files:
+        if file in ("sriov_numvfs", "sriov_totalvfs"):
+            v = sysctl_read(f"{path}/{file}")
+            v_int: Optional[int] = None
+            if v:
+                try:
+                    v_int = int(v.strip())
+                except Exception:
+                    pass
+            result[file] = v_int
+
+    return result
+
+
 def get_vf_representor(
     uplink_ifname: Union[str, bytes], vf_index: int
 ) -> Optional[str]:
@@ -947,6 +972,7 @@ def get_device_infos(with_ethtool: bool = True) -> list[dict[str, Any]]:
 
         if pciaddr is not None:
             dict_add_optional(res, "uplink_rep_ifname", get_uplink_representor(pciaddr))
+            dict_add_optional(res, "sysfs", get_sysfs_pcivalues(pciaddr))
 
         if with_ethtool:
             if ifname is not None:
