@@ -1067,23 +1067,23 @@ def device_infos_find(
     return lst
 
 
+def main() -> None:
+    import argparse
+
+    commands = {f.__name__: f for f in (get_device_infos,)}
+
+    argparser = argparse.ArgumentParser(description="Helper network functions.")
+    argparser.add_argument(
+        "command",
+        choices=commands,
+        default="get_device_infos",
+        nargs="?",
+    )
+    args = argparser.parse_args()
+
+    result = commands[args.command]()
+    print(json.dumps(result))
+
+
 if __name__ == "__main__":
-
-    def main() -> None:
-        import argparse
-
-        commands = {f.__name__: f for f in (get_device_infos,)}
-
-        argparser = argparse.ArgumentParser(description="Helper network functions.")
-        argparser.add_argument(
-            "command",
-            choices=commands,
-            default="get_device_infos",
-            nargs="?",
-        )
-        args = argparser.parse_args()
-
-        result = commands[args.command]()
-        print(json.dumps(result))
-
     main()
