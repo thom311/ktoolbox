@@ -613,6 +613,27 @@ def sysctl_read(
     return s
 
 
+def sysctl_read_int(
+    path: Union[str, bytes],
+    *,
+    base: int = 10,
+    fail_on_error: bool = False,
+) -> Optional[int]:
+    v = sysctl_read(
+        path,
+        strip=True,
+        fail_on_error=fail_on_error,
+    )
+    if not v:
+        return None
+    try:
+        return int(v, base)
+    except Exception:
+        if fail_on_error:
+            raise
+        return None
+
+
 def sysctl_phys_port_name_parse(
     s: Optional[Union[str, bytes]],
 ) -> Optional[tuple[int, int]]:
