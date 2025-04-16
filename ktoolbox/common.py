@@ -1578,18 +1578,34 @@ class StructParseBaseNamed(StructParseBase, abc.ABC):
 
 
 def repeat_for_same_result(fcn: TCallable) -> TCallable:
-    # This decorator wraps @fcn and will call it (up to 10 times) until the
+    # This decorator wraps @fcn and will call it (up to 20 times) until the
     # same result was returned twice in a row. The purpose is when we fetch
     # several pieces of information form the system, that can change at any
     # time. We would like to get a stable, self-consistent result.
     @functools.wraps(fcn)
     def wrapped(*args: Any, **kwargs: Any) -> Any:
+        has_any_result = False
         result = None
-        for i in range(10):
-            new_result = fcn(*args, **kwargs)
-            if i != 0 and result == new_result:
+        has_previous_result = False
+        last_exception = None
+        for i in range(20):
+            try:
+                new_result = fcn(*args, **kwargs)
+            except Exception as e:
+                has_previous_result = False
+                last_exception = e
+                continue
+            if has_previous_result and result == new_result:
                 return new_result
             result = new_result
+            has_any_result = True
+            has_previous_result = True
+
+        if not has_any_result:
+            raise unwrap(last_exception)
+
+        # We didn't get a stable result after 20 tries. Return
+        # the result that we got.
         return result
 
     return typing.cast(TCallable, wrapped)
