@@ -760,17 +760,7 @@ def get_ifnames_from_pciaddr(pciaddr: str) -> Optional[list[str]]:
 
 def get_ifindex_from_ifname(ifname: Union[str, bytes]) -> Optional[int]:
     ifname = validate_ifname(ifname)
-    try:
-        v = sysctl_read(f"/sys/class/net/{ifname}/ifindex")
-    except Exception:
-        pass
-    else:
-        if v:
-            try:
-                return int(v)
-            except Exception:
-                pass
-    return None
+    return sysctl_read_int(f"/sys/class/net/{ifname}/ifindex")
 
 
 def get_address_from_ifname(ifname: Union[str, bytes]) -> Optional[str]:
