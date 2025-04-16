@@ -804,6 +804,20 @@ def get_uplink_representor(pciaddr: str) -> Optional[str]:
     return None
 
 
+def get_sysfs_pci_device_id(pciaddr: str) -> Optional[str]:
+    pciaddr = validate_pciaddr(pciaddr)
+
+    path = f"/sys/bus/pci/devices/{pciaddr}"
+
+    device_id_vendor = sysctl_read_int(f"{path}/vendor", base=16)
+    device_id_device = sysctl_read_int(f"{path}/device", base=16)
+
+    if device_id_vendor is None or device_id_device is None:
+        return None
+
+    return f"{format(device_id_vendor, '04x')}:{format(device_id_device, '04x')}"
+
+
 def get_sysfs_pcivalues(pciaddr: str) -> Optional[dict[str, Any]]:
     pciaddr = validate_pciaddr(pciaddr)
 
@@ -937,6 +951,9 @@ def get_device_infos(with_ethtool: bool = True) -> list[dict[str, Any]]:
                 bustype, busaddress = busaddr
                 if bustype == "usb":
                     res["usbaddr"] = busaddress
+
+        if pciaddr is not None:
+            dict_add_optional(res, "device_id", get_sysfs_pci_device_id(pciaddr))
 
         if ifname is not None:
             link_dict: dict[str, Any] = {}
