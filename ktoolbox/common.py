@@ -8,6 +8,7 @@ import logging
 import os
 import pathlib
 import re
+import socket
 import sys
 import threading
 import time
@@ -1863,11 +1864,16 @@ def _log_parse_level_str(lvl: str) -> Optional[int]:
     return None
 
 
+@functools.cache
+def _get_program_epoch() -> int:
+    return int(time.time())
+
+
 def log_parse_level(
     lvl: Optional[Union[int, bool, str]],
     *,
-    default_level: int = logging.INFO,
-) -> int:
+    default_level: Union[int, TOptionalInt] = logging.INFO,
+) -> Union[int, TOptionalInt]:
     if lvl is None or (isinstance(lvl, str) and lvl.lower().strip() == ""):
         v = log_default_level()
         if v is not None:
@@ -1906,6 +1912,71 @@ def log_default_level() -> Optional[int]:
     return None
 
 
+def _env_get_ktoolbox_logfile_parse(
+    v: str,
+) -> Optional[tuple[str, Optional[int], bool]]:
+    if not v:
+        return None
+    append = False
+    level: Optional[int] = None
+    if ":" in v:
+        s_level, v = v.split(":", 1)
+        if not v:
+            return None
+        try:
+            level = log_parse_level(s_level, default_level=level)
+        except ValueError:
+            pass
+    if v[0] in ("+", "="):
+        append = v[0] == "+"
+        v = v[1:]
+        if not v:
+            return None
+
+    # Supports % substitutions similar to /proc/sys/kernel/core_pattern.
+    substitutions: dict[str, typing.Callable[[], str]] = {
+        "%p": lambda: str(os.getpid()),
+        "%h": lambda: socket.gethostname().split(".", 1)[0],
+        "%t": lambda: str(_get_program_epoch()),
+        "%%": lambda: "%",
+    }
+
+    def _replace(match: re.Match[str]) -> str:
+        match_str = match.group(0)
+        if match_str not in substitutions:
+            return match_str
+        return (substitutions[match_str])()
+
+    v = re.sub("%.", _replace, v)
+
+    return (v, level, append)
+
+
+@functools.cache
+def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
+    v = os.getenv("KTOOLBOX_LOGFILE")
+    if not v:
+        return None
+    return _env_get_ktoolbox_logfile_parse(v)
+
+
+@functools.cache
+def _env_get_ktoolbox_logtag() -> str:
+    v = os.getenv("KTOOLBOX_LOGTAG")
+    if not v:
+        return ""
+    return f"{v.replace('%', '%%')} "
+
+
+def _log_create_formatter() -> logging.Formatter:
+    logtag = _env_get_ktoolbox_logtag()
+    fmt = (
+        f"%(asctime)s.%(msecs)03d %(levelname)-7s {logtag}[th:%(thread)s]: %(message)s"
+    )
+    datefmt = "%Y-%m-%d %H:%M:%S"
+    return logging.Formatter(fmt, datefmt)
+
+
 if typing.TYPE_CHECKING:
     # https://github.com/python/cpython/issues/92128#issue-1222296106
     # https://github.com/python/typeshed/pull/5954#issuecomment-1114270968
@@ -1915,27 +1986,65 @@ else:
     _LogStreamHandler = logging.StreamHandler
 
 
-class _LogHandler(_LogStreamHandler):
+def _logHandlerSetLevelWithLock(handler: logging.Handler, *, level: int) -> None:
+    handler.acquire()
+    try:
+        handler.setLevel(level)
+    finally:
+        handler.release()
+
+
+class _LogHandlerStream(_LogStreamHandler):
     def __init__(self, level: int):
         super().__init__()
-
-        if v := os.getenv("KTOOLBOX_LOGTAG"):
-            logtag = f"{v.replace('%', '%%')} "
-        else:
-            logtag = ""
-
-        fmt = f"%(asctime)s.%(msecs)03d %(levelname)-7s {logtag}[th:%(thread)s]: %(message)s"
-        datefmt = "%Y-%m-%d %H:%M:%S"
-        formatter = logging.Formatter(fmt, datefmt)
         self.setLevel(level)
-        self.setFormatter(formatter)
+        self.setFormatter(_log_create_formatter())
 
-    def setLevelWithLock(self, *, level: int) -> None:
-        self.acquire()
-        try:
-            self.setLevel(level)
-        finally:
-            self.release()
+
+class _LogHandlerFile(logging.FileHandler):
+    def __init__(self, filename: str, *, append: bool, level: int):
+        mode = "a" if append else "w"
+        super().__init__(filename, mode)
+        self.setLevel(level)
+        self.setFormatter(_log_create_formatter())
+
+
+def _logHandler_attach(
+    logHandlerType: Union[type[_LogHandlerStream], type[_LogHandlerFile]],
+    logger: logging.Logger,
+    *,
+    level: int,
+) -> None:
+    if logHandlerType is _LogHandlerFile:
+        logfile = _env_get_ktoolbox_logfile()
+        if logfile is None:
+            return
+
+    handler = iter_get_first(
+        h for h in logger.handlers if isinstance(h, logHandlerType)
+    )
+
+    if handler is None:
+        if logHandlerType is _LogHandlerFile:
+            logfile_file, logfile_level, logfile_append = unwrap(logfile)
+            if logfile_level is None:
+                logfile_level = level
+            handler = _LogHandlerFile(
+                logfile_file,
+                append=logfile_append,
+                level=logfile_level,
+            )
+        else:
+            assert logHandlerType is _LogHandlerStream
+            handler = _LogHandlerStream(level=level)
+        is_new_handler = True
+    else:
+        is_new_handler = False
+
+    if is_new_handler:
+        logger.addHandler(handler)
+    else:
+        _logHandlerSetLevelWithLock(handler, level=level)
 
 
 def log_config_logger(
@@ -1950,6 +2059,13 @@ def log_config_logger(
         # we configure the root logger instead.
         loggers = ("",)
 
+    logger_level = level
+    logfile = _env_get_ktoolbox_logfile()
+    if logfile is not None:
+        logfile_file, logfile_level, logfile_append = unwrap(logfile)
+        if logfile_level is not None:
+            logger_level = min(logger_level, logfile_level)
+
     for logger in loggers:
         if isinstance(logger, str):
             logger = logging.getLogger(logger)
@@ -1957,22 +2073,9 @@ def log_config_logger(
             logger = logger.wrapped_logger
 
         with common_lock:
-            handler = iter_get_first(
-                h for h in logger.handlers if isinstance(h, _LogHandler)
-            )
-
-            if handler is None:
-                handler = _LogHandler(level=level)
-                is_new_handler = True
-            else:
-                is_new_handler = False
-
-            logger.setLevel(level)
-
-            if is_new_handler:
-                logger.addHandler(handler)
-            else:
-                handler.setLevelWithLock(level=level)
+            _logHandler_attach(_LogHandlerStream, logger, level=level)
+            _logHandler_attach(_LogHandlerFile, logger, level=level)
+            logger.setLevel(logger_level)
 
 
 def log_argparse_add_argument_verbose(parser: "argparse.ArgumentParser") -> None:
