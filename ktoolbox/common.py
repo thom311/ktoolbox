@@ -1869,6 +1869,34 @@ def get_program_epoch() -> int:
     return int(time.time())
 
 
+@functools.cache
+def get_program_appname(*, with_pysuffix: bool = True) -> str:
+    name: Optional[str] = None
+
+    if sys.argv:
+        argv0 = sys.argv[0]
+        if argv0 and argv0 not in ("", "-", "-c"):
+            name = os.path.basename(argv0)
+
+    if not name:
+        import __main__
+
+        main_file = getattr(__main__, "__file__", None)
+        if main_file:
+            name = os.path.basename(main_file)
+
+    if not name:
+        if sys.stdin.isatty():
+            return "interactive"
+        return "unknown"
+
+    if not with_pysuffix:
+        if name.endswith(".py"):
+            name = name[:-3]
+
+    return name
+
+
 def log_parse_level(
     lvl: Optional[Union[int, bool, str]],
     *,
@@ -1948,6 +1976,7 @@ def _env_get_ktoolbox_logfile_parse(
         "%p": lambda: str(os.getpid()),
         "%h": lambda: socket.gethostname().split(".", 1)[0],
         "%t": lambda: str(get_program_epoch()),
+        "%a": lambda: get_program_appname(with_pysuffix=False),
         "%%": lambda: "%",
     }
 

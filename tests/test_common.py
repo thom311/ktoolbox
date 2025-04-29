@@ -1618,6 +1618,7 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
     rep_p = str(os.getpid())
     rep_h = socket.gethostname().split(".", 1)[0]
     rep_t = str(common.get_program_epoch())
+    rep_a = common.get_program_appname(with_pysuffix=False)
 
     assert parse("") is None
     assert parse("x") == ("x", None, True)
@@ -1667,7 +1668,11 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
         None,
         True,
     )
-    assert parse("debug:logfile.txt") == ("logfile.txt", logging.DEBUG, True)
+    assert parse("debug:logfile-%a.txt") == (
+        f"logfile-{rep_a}.txt",
+        logging.DEBUG,
+        True,
+    )
     assert parse("debug:logfile-%t.txt") == (
         f"logfile-{rep_t}.txt",
         logging.DEBUG,
