@@ -19,7 +19,7 @@ logger = common.ExtendedLogger(__name__)
 class K8sClient:
     def __init__(self, kubeconfig: typing.Optional[str] = None):
         if kubeconfig is None:
-            kubeconfig = os.getenv("KUBECONFIG")
+            kubeconfig = common.getenv_config("KUBECONFIG")
             if not kubeconfig:
                 raise RuntimeError(
                     "KUBECONFIG environment variable not set and no kubeconfig argument specified"

@@ -1898,7 +1898,7 @@ def log_all_loggers() -> bool:
     # and configures only certain loggers ("myapp", "ktoolbox"). If
     # KTOOLBOX_ALL_LOGGERS is set to True, then instead the root logger
     # will be configured which may affect also other python modules.
-    return str_to_bool(os.getenv("KTOOLBOX_ALL_LOGGERS"), False)
+    return str_to_bool(getenv_config("KTOOLBOX_ALL_LOGGERS"), False)
 
 
 @functools.cache
@@ -1908,7 +1908,7 @@ def log_default_level() -> Optional[int]:
     # "KTOOLBOX_LOGLEVEL" environment variable. If still unspecified, the
     # default is determined by the main application that calls
     # common.log_config_logger().
-    v = os.getenv("KTOOLBOX_LOGLEVEL")
+    v = getenv_config("KTOOLBOX_LOGLEVEL")
     if v is not None:
         return _log_parse_level_str(v)
     return None
@@ -1971,7 +1971,7 @@ def _env_get_ktoolbox_logfile_parse(
 
 @functools.cache
 def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
-    v = os.getenv("KTOOLBOX_LOGFILE")
+    v = getenv_config("KTOOLBOX_LOGFILE")
     if not v:
         return None
     return _env_get_ktoolbox_logfile_parse(v)
@@ -1979,7 +1979,7 @@ def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
 
 @functools.cache
 def _env_get_ktoolbox_stdout() -> bool:
-    v = os.getenv("KTOOLBOX_STDOUT")
+    v = getenv_config("KTOOLBOX_STDOUT")
     if v:
         v = v.strip().lower()
         v_bool = str_to_bool(v, on_error=None)
@@ -1994,7 +1994,7 @@ def _env_get_ktoolbox_stdout() -> bool:
 
 @functools.cache
 def _env_get_ktoolbox_logtag() -> str:
-    v = os.getenv("KTOOLBOX_LOGTAG")
+    v = getenv_config("KTOOLBOX_LOGTAG")
     if not v:
         return ""
     return f"{v.replace('%', '%%')} "
@@ -2515,7 +2515,7 @@ def thread_list_join_all(
 
 @functools.cache
 def get_current_host() -> str:
-    chost = os.getenv("KTOOLBOX_CURRENT_HOST")
+    chost = getenv_config("KTOOLBOX_CURRENT_HOST")
     if chost:
         return chost
 
