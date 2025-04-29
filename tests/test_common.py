@@ -1617,7 +1617,7 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
 
     rep_p = str(os.getpid())
     rep_h = socket.gethostname().split(".", 1)[0]
-    rep_t = str(common._get_program_epoch())
+    rep_t = str(common.get_program_epoch())
 
     assert parse("") is None
     assert parse("x") == ("x", None, True)

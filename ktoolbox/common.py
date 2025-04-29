@@ -1865,7 +1865,7 @@ def _log_parse_level_str(lvl: str) -> Optional[int]:
 
 
 @functools.cache
-def _get_program_epoch() -> int:
+def get_program_epoch() -> int:
     return int(time.time())
 
 
@@ -1947,7 +1947,7 @@ def _env_get_ktoolbox_logfile_parse(
     substitutions: dict[str, typing.Callable[[], str]] = {
         "%p": lambda: str(os.getpid()),
         "%h": lambda: socket.gethostname().split(".", 1)[0],
-        "%t": lambda: str(_get_program_epoch()),
+        "%t": lambda: str(get_program_epoch()),
         "%%": lambda: "%",
     }
 
