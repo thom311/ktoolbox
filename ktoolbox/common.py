@@ -2583,3 +2583,14 @@ def format_duration(seconds: float) -> str:
         s_secs = f"{secs:07.4f}"
     s += f"{s_secs}"
     return s
+
+
+def getenv_config(name: str) -> Optional[str]:
+    """
+    Return the value of a user-configurable environment variable.
+
+    This wraps os.getenv() for the purpose of marking environment variables
+    that are intended for user configuration. By using this function, it's easy
+    to locate all such variables via grep or static analysis.
+    """
+    return os.getenv(name)
