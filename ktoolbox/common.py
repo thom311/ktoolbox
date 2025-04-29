@@ -1978,8 +1978,8 @@ def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
 
 
 @functools.cache
-def _env_get_ktoolbox_stdout() -> bool:
-    v = getenv_config("KTOOLBOX_STDOUT")
+def _env_get_ktoolbox_logstdout() -> bool:
+    v = getenv_config("KTOOLBOX_LOGSTDOUT")
     if v:
         v = v.strip().lower()
         v_bool = str_to_bool(v, on_error=None)
@@ -2028,7 +2028,7 @@ def _logHandlerSetLevelWithLock(handler: logging.Handler, *, level: int) -> None
 
 class _LogHandlerStream(_LogStreamHandler):
     def __init__(self, level: int):
-        stream = sys.stdout if _env_get_ktoolbox_stdout() else sys.stderr
+        stream = sys.stdout if _env_get_ktoolbox_logstdout() else sys.stderr
         super().__init__(stream)
         self.setLevel(level)
         self.setFormatter(_log_create_formatter())
