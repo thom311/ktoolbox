@@ -1622,15 +1622,18 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
     assert parse("") is None
     assert parse("x") == ("x", None, True)
     assert parse("::x") == (":x", None, True)
+    assert parse("   ::x") == (":x", None, True)
     assert parse("+x") == ("x", None, True)
     assert parse("=x") == ("x", None, False)
+    assert parse("x:=x") == ("x:=x", None, True)
+    assert parse("  debuG :=x") == ("x", logging.DEBUG, False)
     assert parse(":+x") == ("x", None, True)
     assert parse("debug:x") == ("x", logging.DEBUG, True)
     assert parse("debug:=x") == ("x", logging.DEBUG, False)
     assert parse("DEBUG:+x") == ("x", logging.DEBUG, True)
     assert parse("DEBUG:+x%p%h") == (f"x{rep_p}{rep_h}", logging.DEBUG, True)
     assert parse("DEBUG:+x%%p%h") == (f"x%p{rep_h}", logging.DEBUG, True)
-    assert parse("invalid_level:x") == ("x", None, True)
+    assert parse("invalid_level:x") == ("invalid_level:x", None, True)
     assert parse("file.txt") == ("file.txt", None, True)
     assert parse("%%") == ("%", None, True)
     assert parse("%p") == (rep_p, None, True)
@@ -1650,10 +1653,14 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
     assert parse("debug:foo:bar") == ("foo:bar", logging.DEBUG, True)
     assert parse("DeBuG:+logfile.txt") == ("logfile.txt", logging.DEBUG, True)
     assert parse("InFo:+logfile.txt") == ("logfile.txt", logging.INFO, True)
-    assert parse("%%p%%h:.log") == (".log", None, True)
+    assert parse("%%p%%h:.log") == ("%p%h:.log", None, True)
     assert parse("debug:foo:bar") == ("foo:bar", logging.DEBUG, True)
     assert parse("debug:+file_%%p%%h:.log") == ("file_%p%h:.log", logging.DEBUG, True)
     assert parse("debug:") is None
+    assert parse("+") is None
+    assert parse("=") is None
+    assert parse(" info :+") is None
+    assert parse(" info :x") == ("x", logging.INFO, True)
     assert parse("file_%%p%h.log") == (f"file_%p{rep_h}.log", None, True)
     assert parse("file_%%p%h%p%h%p.log") == (
         f"file_%p{rep_h}{rep_p}{rep_h}{rep_p}.log",

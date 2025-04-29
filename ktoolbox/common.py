@@ -1873,11 +1873,13 @@ def log_parse_level(
     lvl: Optional[Union[int, bool, str]],
     *,
     default_level: Union[int, TOptionalInt] = logging.INFO,
+    prefer_global_default: bool = True,
 ) -> Union[int, TOptionalInt]:
     if lvl is None or (isinstance(lvl, str) and lvl.lower().strip() == ""):
-        v = log_default_level()
-        if v is not None:
-            return v
+        if prefer_global_default:
+            v = log_default_level()
+            if v is not None:
+                return v
         return default_level
     if isinstance(lvl, bool):
         return logging.DEBUG if lvl else logging.INFO
@@ -1920,13 +1922,21 @@ def _env_get_ktoolbox_logfile_parse(
     append = True
     level: Optional[int] = None
     if ":" in v:
-        s_level, v = v.split(":", 1)
-        if not v:
-            return None
+        s_level, v1 = v.split(":", 1)
         try:
-            level = log_parse_level(s_level, default_level=level)
+            level = log_parse_level(
+                s_level,
+                prefer_global_default=False,
+                default_level=None,
+            )
         except ValueError:
+            # If this is not a valid log-level, we assume that it is part of
+            # the filename.
             pass
+        else:
+            if not v1:
+                return None
+            v = v1
     if v[0] in ("+", "="):
         append = v[0] == "+"
         v = v[1:]
