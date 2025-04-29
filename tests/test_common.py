@@ -1620,43 +1620,49 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
     rep_t = str(common._get_program_epoch())
 
     assert parse("") is None
-    assert parse("x") == ("x", None, False)
-    assert parse("::x") == (":x", None, False)
+    assert parse("x") == ("x", None, True)
+    assert parse("::x") == (":x", None, True)
     assert parse("+x") == ("x", None, True)
+    assert parse("=x") == ("x", None, False)
     assert parse(":+x") == ("x", None, True)
-    assert parse("debug:x") == ("x", logging.DEBUG, False)
+    assert parse("debug:x") == ("x", logging.DEBUG, True)
     assert parse("debug:=x") == ("x", logging.DEBUG, False)
     assert parse("DEBUG:+x") == ("x", logging.DEBUG, True)
     assert parse("DEBUG:+x%p%h") == (f"x{rep_p}{rep_h}", logging.DEBUG, True)
     assert parse("DEBUG:+x%%p%h") == (f"x%p{rep_h}", logging.DEBUG, True)
-    assert parse("invalid_level:x") == ("x", None, False)
-    assert parse("file.txt") == ("file.txt", None, False)
-    assert parse("%%") == ("%", None, False)
-    assert parse("%p") == (rep_p, None, False)
-    assert parse("%h") == (rep_h, None, False)
-    assert parse("test_%p_%h.log") == (f"test_{rep_p}_{rep_h}.log", None, False)
-    assert parse("file_%%p%%h.log") == ("file_%p%h.log", None, False)
+    assert parse("invalid_level:x") == ("x", None, True)
+    assert parse("file.txt") == ("file.txt", None, True)
+    assert parse("%%") == ("%", None, True)
+    assert parse("%p") == (rep_p, None, True)
+    assert parse("%h") == (rep_h, None, True)
+    assert parse("test_%p_%h.log") == (f"test_{rep_p}_{rep_h}.log", None, True)
+    assert parse("file_%%p%%h.log") == ("file_%p%h.log", None, True)
     assert parse("debug:+logfile.txt") == ("logfile.txt", logging.DEBUG, True)
     assert parse("info:=logfile.txt") == ("logfile.txt", logging.INFO, False)
-    assert parse("WARNING:logfile.txt") == ("logfile.txt", logging.WARNING, False)
+    assert parse("WARNING:logfile.txt") == ("logfile.txt", logging.WARNING, True)
     assert parse("debug:+logfile.txt") == ("logfile.txt", logging.DEBUG, True)
     assert parse("info:+log_%p_%h.log") == (
         f"log_{rep_p}_{rep_h}.log",
         logging.INFO,
         True,
     )
-    assert parse(":logfile.txt") == ("logfile.txt", None, False)
-    assert parse("debug:foo:bar") == ("foo:bar", logging.DEBUG, False)
+    assert parse(":logfile.txt") == ("logfile.txt", None, True)
+    assert parse("debug:foo:bar") == ("foo:bar", logging.DEBUG, True)
     assert parse("DeBuG:+logfile.txt") == ("logfile.txt", logging.DEBUG, True)
     assert parse("InFo:+logfile.txt") == ("logfile.txt", logging.INFO, True)
-    assert parse("%%p%%h:.log") == (".log", None, False)
-    assert parse("debug:foo:bar") == ("foo:bar", logging.DEBUG, False)
+    assert parse("%%p%%h:.log") == (".log", None, True)
+    assert parse("debug:foo:bar") == ("foo:bar", logging.DEBUG, True)
     assert parse("debug:+file_%%p%%h:.log") == ("file_%p%h:.log", logging.DEBUG, True)
     assert parse("debug:") is None
-    assert parse("file_%%p%h.log") == (f"file_%p{rep_h}.log", None, False)
-    assert parse("debug:logfile.txt") == ("logfile.txt", logging.DEBUG, False)
+    assert parse("file_%%p%h.log") == (f"file_%p{rep_h}.log", None, True)
+    assert parse("file_%%p%h%p%h%p.log") == (
+        f"file_%p{rep_h}{rep_p}{rep_h}{rep_p}.log",
+        None,
+        True,
+    )
+    assert parse("debug:logfile.txt") == ("logfile.txt", logging.DEBUG, True)
     assert parse("debug:logfile-%t.txt") == (
         f"logfile-{rep_t}.txt",
         logging.DEBUG,
-        False,
+        True,
     )

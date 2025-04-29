@@ -1917,7 +1917,7 @@ def _env_get_ktoolbox_logfile_parse(
 ) -> Optional[tuple[str, Optional[int], bool]]:
     if not v:
         return None
-    append = False
+    append = True
     level: Optional[int] = None
     if ":" in v:
         s_level, v = v.split(":", 1)
