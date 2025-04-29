@@ -1945,7 +1945,14 @@ def _env_get_ktoolbox_logfile_parse(
         match_str = match.group(0)
         if match_str not in substitutions:
             return match_str
-        return (substitutions[match_str])()
+
+        val = (substitutions[match_str])()
+
+        # Freeze the value that we fetched (so that multiple replacements are
+        # guaranteed to give the same result).
+        substitutions[match_str] = lambda: val
+
+        return val
 
     v = re.sub("%.", _replace, v)
 
