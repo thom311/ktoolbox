@@ -2003,7 +2003,12 @@ def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
     v = getenv_config("KTOOLBOX_LOGFILE")
     if not v:
         return None
-    return _env_get_ktoolbox_logfile_parse(v)
+    logfile = _env_get_ktoolbox_logfile_parse(v)
+    if logfile is None:
+        return None
+    logfile_file, logfile_level, logfile_append = logfile
+    logfile_file = path_norm(logfile_file, make_absolute=True)
+    return (logfile_file, logfile_level, logfile_append)
 
 
 @functools.cache
