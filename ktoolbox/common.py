@@ -2070,6 +2070,9 @@ class _LogHandlerStream(_LogStreamHandler):
 
 class _LogHandlerFile(logging.FileHandler):
     def __init__(self, filename: str, *, append: bool, level: int):
+        filename = path_norm(filename, make_absolute=True)
+        dirname = os.path.dirname(filename)
+        os.makedirs(dirname, exist_ok=True)
         mode = "a" if append else "w"
         super().__init__(filename, mode)
         self.setLevel(level)
