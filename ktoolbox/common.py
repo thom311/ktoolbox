@@ -2589,13 +2589,18 @@ def run_main(
     ],
     *,
     error_code: int = EX_SOFTWARE,
+    logger: Optional[logging.Logger] = logger,
 ) -> typing.NoReturn:
     try:
         exit_code = main_fcn()
     except Exception:
         import traceback
 
-        traceback.print_exc()
+        if logger is None:
+            traceback.print_exc()
+        else:
+            logger.error(f"FATAL ERROR:\n{traceback.format_exc()}")
+
         sys.exit(error_code)
     if exit_code is None:
         exit_code = 0
