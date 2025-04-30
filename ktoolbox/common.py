@@ -2283,7 +2283,7 @@ class ExtendedLogger(logging.Logger):
         if backtrace:
             import traceback
 
-            self.error(f"FATAL ERROR. BACKTRACE:\n{''.join(traceback.format_stack())}")
+            self.error(f"FATAL ERROR:\n{traceback.format_exc()}")
 
         sys.exit(exit_code)
 
