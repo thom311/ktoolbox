@@ -2636,3 +2636,85 @@ def getenv_config(name: str) -> Optional[str]:
     to locate all such variables via grep or static analysis.
     """
     return os.getenv(name)
+
+
+def time_monotonic(now: Optional[float]) -> float:
+    if now is None:
+        return time.monotonic()
+    return float(now)
+
+
+class NextExpiry:
+    @staticmethod
+    def _next(
+        expiry_1: Optional[float],
+        expiry_2: Optional[float] = None,
+    ) -> Optional[float]:
+        if expiry_1 is None:
+            if expiry_2 is None:
+                return None
+            return float(expiry_2)
+        if expiry_2 is None:
+            return float(expiry_1)
+        return min(float(expiry_1), float(expiry_2))
+
+    def __init__(self, expiry: Optional[Union[float, "NextExpiry"]] = None) -> None:
+        self._expiry: Optional[float]
+        if isinstance(expiry, NextExpiry):
+            expiry = expiry._expiry
+        self._expiry = NextExpiry._next(expiry)
+
+    def reset(self, expiry: Optional[float] = None) -> None:
+        self._expiry = NextExpiry._next(expiry)
+
+    def update(
+        self,
+        *,
+        now: Optional[float] = None,
+        timeout: Optional[float] = None,
+        expiry: Optional[float] = None,
+    ) -> None:
+        if timeout is None and expiry is None:
+            return
+        if timeout is not None:
+            expiry = NextExpiry._next(
+                expiry,
+                time_monotonic(now) + float(timeout),
+            )
+        self._expiry = NextExpiry._next(self._expiry, expiry)
+
+    @staticmethod
+    def up(
+        self: Optional["NextExpiry"],
+        *,
+        now: Optional[float] = None,
+        timeout: Optional[float] = None,
+        expiry: Optional[float] = None,
+    ) -> None:
+        if self is None:
+            return
+        self.update(now=now, timeout=timeout, expiry=expiry)
+
+    def expires_at(
+        self,
+        *,
+        now: Optional[float] = None,
+        expiry: Optional[float] = None,
+        timeout: Optional[float] = None,
+    ) -> Optional[float]:
+        next_expiry = NextExpiry(self)
+        next_expiry.update(now=now, expiry=expiry, timeout=timeout)
+        return next_expiry._expiry
+
+    def expires_in(
+        self,
+        *,
+        now: Optional[float] = None,
+        expiry: Optional[float] = None,
+        timeout: Optional[float] = None,
+    ) -> Optional[float]:
+        now = time_monotonic(now)
+        expiry = self.expires_at(now=now, expiry=expiry, timeout=timeout)
+        if expiry is None:
+            return None
+        return expiry - now

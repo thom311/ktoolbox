@@ -1678,3 +1678,19 @@ def test_env_get_ktoolbox_logfile_parse() -> None:
         logging.DEBUG,
         True,
     )
+
+
+def test_next_expiry() -> None:
+    now = common.time_monotonic(None)
+
+    next_expiry = common.NextExpiry()
+
+    next_expiry.update(timeout=5)
+
+    assert common.unwrap(next_expiry.expires_in()) <= 5.0
+    assert common.unwrap(next_expiry.expires_at()) > now + 5.0
+
+    next_expiry.reset()
+
+    common.NextExpiry.up(next_expiry, now=now, timeout=7)
+    assert next_expiry.expires_at() == now + 7.0
