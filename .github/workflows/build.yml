@@ -1,0 +1,63 @@
+name: Build and Publish Wheel
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  build-and-publish:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install build module
+        run: python -m pip install --upgrade build
+
+      - name: Build wheel
+        run: python -m build --wheel
+
+      - name: Push wheel to gh-pages
+        run: |
+          set -ex
+
+          WHEEL_NAME="$(ls -1 dist/*.whl)"
+
+          COUNT="$(git rev-list --count HEAD)"
+          SHA="$(git -c core.abbrev=12 rev-parse --short HEAD)"
+          DIRNAME="wheels/$COUNT.$SHA"
+
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git clone --branch gh-pages https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git gh-pages
+          cd gh-pages
+
+          mkdir -p "$DIRNAME"
+          cp ../$WHEEL_NAME "$DIRNAME/"
+
+          pushd wheels
+          cat <<EOF > ./index.html
+          <!DOCTYPE html>
+          <html>
+            <head><meta charset="UTF-8"><title>Wheel Index for ktoolbox</title></head>
+          <body>
+            <h1>Available Wheels</h1>
+          EOF
+          for whl in */*.whl ; do
+            echo "  <a href=\"$whl\">$whl</a><br>" >> ./index.html
+          done
+          echo "</body></html>" >> ./index.html
+          popd
+
+          git add .
+          git commit -m "Add wheel $DIRNAME/$WHEEL_NAME"
+          git push origin gh-pages
