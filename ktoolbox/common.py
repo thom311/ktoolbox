@@ -56,6 +56,7 @@ TOptionalBool = TypeVar("TOptionalBool", bound=Optional[bool])
 TOptionalFloat = TypeVar("TOptionalFloat", bound=Optional[float])
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
+TAnyStr = TypeVar("TAnyStr", str, bytes)
 TCallable = typing.TypeVar("TCallable", bound=typing.Callable[..., typing.Any])
 TStructParseBaseNamed = typing.TypeVar(
     "TStructParseBaseNamed", bound="StructParseBaseNamed"
@@ -151,6 +152,36 @@ def str_to_bool(
         return on_error
 
     raise ValueError(f"Value {val} is not a boolean")
+
+
+@typing.overload
+def as_regex(
+    pattern: Union[TAnyStr, re.Pattern[TAnyStr]],
+    *,
+    flags: int = 0,
+) -> re.Pattern[TAnyStr]: ...
+
+
+@typing.overload
+def as_regex(
+    pattern: Optional[Union[TAnyStr, re.Pattern[TAnyStr]]],
+    *,
+    flags: int = 0,
+) -> Optional[re.Pattern[TAnyStr]]: ...
+
+
+def as_regex(
+    pattern: Optional[Union[TAnyStr, re.Pattern[TAnyStr]]],
+    *,
+    flags: int = 0,
+) -> Optional[re.Pattern[TAnyStr]]:
+    if pattern is None:
+        return None
+    if isinstance(pattern, re.Pattern):
+        return pattern
+    if isinstance(pattern, (str, bytes)):
+        return re.compile(pattern, flags)
+    raise ValueError("not a valid regex pattern")
 
 
 def validate_dns_name(name: str) -> bool:
@@ -1784,30 +1815,24 @@ class Serial:
     @typing.overload
     def expect(
         self,
-        pattern: Union[None, str, re.Pattern[str]],
+        pattern: Optional[Union[str, re.Pattern[str]]],
         timeout: float = 30,
     ) -> Optional[str]: ...
 
     def expect(
         self,
-        pattern: Union[None, str, re.Pattern[str]],
+        pattern: Optional[Union[str, re.Pattern[str]]],
         timeout: float = 30,
     ) -> Optional[str]:
         import select
 
         end_timestamp = time.monotonic() + timeout
 
-        pattern_re: Optional[re.Pattern[str]]
-        if pattern is None:
-            pattern_re = None
-        elif isinstance(pattern, str):
-            # We use DOTALL like pexpect does.
-            # If you need something else, compile the pattern yourself.
-            #
-            # See also https://pexpect.readthedocs.io/en/stable/overview.html#find-the-end-of-line-cr-lf-conventions
-            pattern_re = re.compile(pattern, re.DOTALL)
-        else:
-            pattern_re = pattern
+        # We use DOTALL like pexpect does.
+        # If you need something else, compile the pattern yourself.
+        #
+        # See also https://pexpect.readthedocs.io/en/stable/overview.html#find-the-end-of-line-cr-lf-conventions
+        pattern_re = as_regex(pattern, flags=re.DOTALL)
 
         if pattern_re is not None:
             logger.debug(f"serial[{self.port}]: expect message {repr(pattern)}")
