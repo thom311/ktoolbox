@@ -940,6 +940,65 @@ def test_structparse_pop_str_empty() -> None:
     with pytest.raises(ValueError):
         common.structparse_pop_str(_pargs(""), allow_empty=False, check=_check)
 
+    with pytest.raises(ValueError):
+        common.structparse_pop_str_name(_pargs())
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str_name(_pargs(""))
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str_name(
+            _pargs(""),
+            check_ctx=lambda pargs, val: None,
+        )
+
+    def _check1(pargs: StructParsePopContext, val: str) -> None:
+        assert pargs.key == "foo"
+        assert val == "strval"
+
+    assert (
+        common.structparse_pop_str_name(
+            _pargs("strval"),
+            check_ctx=_check1,
+        )
+        == "strval"
+    )
+
+    with pytest.raises(AssertionError):
+        common.structparse_pop_str(
+            _pargs("invalid"),
+            check_ctx=_check1,
+        )
+
+    assert (
+        common.structparse_pop_str_name(
+            _pargs("hi"),
+            check_regex="i",
+        )
+        == "hi"
+    )
+
+    assert (
+        common.structparse_pop_str(
+            _pargs("hi"),
+            check=lambda val: True,
+            check_regex="h",
+        )
+        == "hi"
+    )
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str(
+            _pargs("hix"),
+            check_regex=re.compile("^hi$"),
+        )
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str(
+            _pargs("hix"),
+            check_regex="xx",
+        )
+
 
 def test_structparse_pop_bool() -> None:
     for test_val in (None, "", "default", "-1", "bogus"):

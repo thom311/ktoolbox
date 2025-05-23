@@ -1193,6 +1193,7 @@ def structparse_pop_str(
     check: Optional[typing.Callable[[str], bool]] = None,
     check_missing: Optional[typing.Callable[[StructParsePopContext], None]] = None,
     check_ctx: Optional[typing.Callable[[StructParsePopContext, str], None]] = None,
+    check_regex: Optional[Union[str, re.Pattern[str]]] = None,
 ) -> Union[str, TOptionalStr]:
     """
     Pop "key" from "vdict", validates that it's a string and returns it.
@@ -1238,6 +1239,13 @@ def structparse_pop_str(
     if check_ctx is not None:
         check_ctx(pargs, v)
 
+    if check_regex is not None:
+        pattern_re = as_regex(check_regex)
+        if not pattern_re.search(v):
+            raise pargs.value_error(
+                f"does not match pattern {repr(pattern_re.pattern)}"
+            )
+
     return typing.cast(TOptionalStr, v)
 
 
@@ -1245,11 +1253,17 @@ def structparse_pop_str_name(
     pargs: StructParsePopContext,
     *,
     default: Union[TOptionalStr, _MISSING_TYPE] = MISSING,
+    check: Optional[typing.Callable[[str], bool]] = None,
+    check_ctx: Optional[typing.Callable[[StructParsePopContext, str], None]] = None,
+    check_regex: Optional[Union[str, re.Pattern[str]]] = None,
 ) -> Union[str, TOptionalStr]:
     return structparse_pop_str(
         pargs,
         default=default,
         allow_empty=False,
+        check=check,
+        check_ctx=check_ctx,
+        check_regex=check_regex,
     )
 
 
