@@ -1696,3 +1696,28 @@ def test_next_expiry() -> None:
 
     common.NextExpiry.up(next_expiry, now=now, timeout=7)
     assert next_expiry.expires_at() == now + 7.0
+
+
+def test_validate_dns_name() -> None:
+    assert common.validate_dns_name("example.com") is True
+    assert common.validate_dns_name("sub.domain.example") is True
+    assert common.validate_dns_name("a" * 63 + ".com") is True
+    assert common.validate_dns_name("example.com.") is True
+    assert common.validate_dns_name("xn--d1acpjx3f.xn--p1ai") is True
+
+    assert common.validate_dns_name("") is False
+    assert common.validate_dns_name(".") is False
+    assert common.validate_dns_name("example..com") is False
+    assert common.validate_dns_name("-example.com") is False
+    assert common.validate_dns_name("example-.com") is False
+    assert common.validate_dns_name("a" * 64 + ".com") is False
+    assert common.validate_dns_name("example.com..") is False
+    assert common.validate_dns_name("exa mple.com") is False
+    assert common.validate_dns_name("example.com-") is False
+    assert common.validate_dns_name("." * 254) is False
+
+    with pytest.raises(ValueError):
+        common.validate_dns_name(None)  # type: ignore
+
+    with pytest.raises(ValueError):
+        common.validate_dns_name(123)  # type: ignore

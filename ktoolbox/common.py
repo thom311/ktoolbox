@@ -153,6 +153,21 @@ def str_to_bool(
     raise ValueError(f"Value {val} is not a boolean")
 
 
+def validate_dns_name(name: str) -> bool:
+    if not isinstance(name, str):
+        raise ValueError("dns name must be a string")
+    if not name or len(name) > 253:
+        return False
+    if name[-1] == ".":
+        # One trailing dot is accepted, it means an absolute name.
+        name = name[:-1]
+    # - (?!-) don't start label hyphen
+    # - [A-Za-z0-9-]{1,63} contain 1 to 63 characters
+    # - (?<!-) don't end with hyphen
+    label_regex = re.compile(r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$")
+    return all(label_regex.match(label) for label in name.split("."))
+
+
 @typing.overload
 def iter_get_first(
     lst: Iterable[T],
