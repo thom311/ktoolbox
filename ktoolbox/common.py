@@ -2615,15 +2615,14 @@ def format_duration(seconds: float) -> str:
         s_sign = ""
     minutes, secs = divmod(seconds, 60)
     hours, minutes = divmod(int(minutes), 60)
+    days, hours = divmod(hours, 24)
+    secs = round(secs, 4)
     s = s_sign
+    if days != 0:
+        s += f"{days}d-"
     s += f"{hours:02}:"
     s += f"{minutes:02}:"
-    if secs == int(secs):
-        secs = int(secs)
-        s_secs = f"{secs:02}"
-    else:
-        s_secs = f"{secs:07.4f}"
-    s += f"{s_secs}"
+    s += f"{secs:07.4f}"
     return s
 
 

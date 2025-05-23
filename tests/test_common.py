@@ -1593,23 +1593,25 @@ def test_thread_list() -> None:
 
 def test_format_duration() -> None:
     assert common.format_duration(125.5) == "00:02:05.5000"
-    assert common.format_duration(125) == "00:02:05"
-    assert common.format_duration(0) == "00:00:00"
+    assert common.format_duration(125) == "00:02:05.0000"
+    assert common.format_duration(0) == "00:00:00.0000"
     assert common.format_duration(-0.5) == "-00:00:00.5000"
-    assert common.format_duration(5) == "00:00:05"
+    assert common.format_duration(5) == "00:00:05.0000"
     assert common.format_duration(5.25) == "00:00:05.2500"
-    assert common.format_duration(60) == "00:01:00"
+    assert common.format_duration(60) == "00:01:00.0000"
     assert common.format_duration(60.75) == "00:01:00.7500"
-    assert common.format_duration(3599) == "00:59:59"
+    assert common.format_duration(3599) == "00:59:59.0000"
     assert common.format_duration(3599.999) == "00:59:59.9990"
-    assert common.format_duration(3600) == "01:00:00"
+    assert common.format_duration(3600) == "01:00:00.0000"
     assert common.format_duration(3600.5) == "01:00:00.5000"
     assert common.format_duration(3661.125) == "01:01:01.1250"
     assert common.format_duration(7325.75) == "02:02:05.7500"
-    assert common.format_duration(-45) == "-00:00:45"
+    assert common.format_duration(-45) == "-00:00:45.0000"
     assert common.format_duration(-3661.8) == "-01:01:01.8000"
-    assert common.format_duration(36000) == "10:00:00"
+    assert common.format_duration(36000) == "10:00:00.0000"
     assert common.format_duration(86399.9999) == "23:59:59.9999"
+    assert common.format_duration(86400) == "1d-00:00:00.0000"
+    assert common.format_duration(-86400) == "-1d-00:00:00.0000"
 
 
 def test_env_get_ktoolbox_logfile_parse() -> None:
