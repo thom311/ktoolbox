@@ -2350,9 +2350,15 @@ class Cancellable:
         self._write_fd = -1
 
     def __del__(self) -> None:
-        if self._read_fd != -1:
-            os.close(self._read_fd)
-            os.close(self._write_fd)
+        with self._lock:
+            fds = (self._read_fd, self._write_fd)
+            self._read_fd = -1
+            self._write_fd = -1
+        for fd in fds:
+            try:
+                os.close(fd)
+            except Exception:
+                pass
 
     @staticmethod
     def is_cancelled(self: Optional["Cancellable"]) -> bool:
