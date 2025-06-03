@@ -18,9 +18,10 @@ the projects [ocp-traffic-flow-tests](https://github.com/wizhaoredhat/ocp-traffi
 [cluster-deployment-automation](https://github.com/bn222/cluster-deployment-automation).
 
 
-## Wheel Files
+## Installation and Wheel Files
 
-You can find compiled wheels files at https://thom311.github.io/ktoolbox/wheels/ .
+You can find pre-compiled wheels files at https://thom311.github.io/ktoolbox/wheels/ and on
+the [gh-pages](https://github.com/thom311/ktoolbox/commits/gh-pages/) branch.
 
 You can install via:
 
@@ -32,4 +33,13 @@ The benefit of using wheel files is that it's cheaper to install and you can
 copy the wheel file around.
 
 The benefit of "git+https://" URL is that it can contain the full git SHA
-sum to cryptographically ensure we install what was intended.
+sum to cryptographically ensure what is installed.
+
+Alternatively, you can also use (e.g.)
+
+  - `pip install https://raw.githubusercontent.com/thom311/ktoolbox/cb38f23eb271cbbe38ea83357132362eade61c49/wheels/140.7e3728001e18/ktoolbox-0.8.0-py3-none-any.whl`
+
+which has the benefit that the git commit sha cryptographically refers to the
+content of a known commit on the `gh-pages` branch. You still have no guarantee
+that the content of that wheel file is something in particular. But you have the
+guarantee that this is served from a known commit on the `gh-pages` branch.
