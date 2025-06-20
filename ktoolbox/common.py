@@ -2650,6 +2650,7 @@ def run_main(
     *,
     error_code: int = EX_SOFTWARE,
     logger: Optional[logging.Logger] = logger,
+    error_code_keyboard_interrupt: Optional[int] = None,
 ) -> typing.NoReturn:
     try:
         exit_code = main_fcn()
@@ -2662,6 +2663,11 @@ def run_main(
             logger.error(f"FATAL ERROR:\n{traceback.format_exc()}")
 
         sys.exit(error_code)
+    except KeyboardInterrupt:
+        if error_code_keyboard_interrupt is None:
+            raise
+        sys.exit(error_code_keyboard_interrupt)
+
     if exit_code is None:
         exit_code = 0
     sys.exit(exit_code)
