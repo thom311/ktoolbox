@@ -829,7 +829,7 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
             f"There are left over keys {list(data)} to create dataclass {cls}"
         )
 
-    return cast(T, cls(**create_kwargs))
+    return cls(**create_kwargs)
 
 
 def dataclass_from_json(cls: type[T], jsondata: str) -> T:
