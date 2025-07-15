@@ -475,8 +475,9 @@ def path_norm(
         # The result is still the same as the orignal string. Return
         # the original instance.
         return path_orig
+
     if isinstance(path_orig, pathlib.Path):
-        return typing.cast(TPathNormPath, (type(path_orig))(result))
+        return (type(path_orig))(result)
     return typing.cast(TPathNormPath, result)
 
 
