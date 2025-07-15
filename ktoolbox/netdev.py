@@ -2,6 +2,7 @@ import json
 import os
 import re
 import socket
+import sys
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -1131,7 +1132,11 @@ def main() -> None:
     args = argparser.parse_args()
 
     result = commands[args.command]()
-    print(json.dumps(result))
+    out = json.dumps(result)
+    try:
+        print(out)
+    except BrokenPipeError:
+        sys.exit(141)  # SIGPIPE
 
 
 if __name__ == "__main__":
