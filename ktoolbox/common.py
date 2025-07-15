@@ -85,7 +85,11 @@ MISSING = _MISSING_TYPE()
 # So, using this acts as a comment to the reader that the code expects kw_only.
 # It is also enforced at runtime. It also allows to find all the places where
 # we would like to use kw_only=True but cannot due to Python 3.9 compatibility.
-KW_ONLY_DATACLASS = {"kw_only": True} if "kw_only" in dataclass.__kwdefaults__ else {}
+KW_ONLY_DATACLASS = (
+    {"kw_only": True}
+    if (dataclass.__kwdefaults__ and "kw_only" in dataclass.__kwdefaults__)
+    else {}
+)
 
 
 def raise_exception(ex: Exception) -> typing.NoReturn:
