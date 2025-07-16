@@ -2269,6 +2269,7 @@ class ExtendedLogger(logging.Logger):
     _EXTENDED_ATTRIBUTES = (
         "wrapped_logger",
         "error_and_exit",
+        "__dir__",
     )
 
     def __getattribute__(self, name: str) -> Any:
@@ -2288,6 +2289,12 @@ class ExtendedLogger(logging.Logger):
         if name in ExtendedLogger._EXTENDED_ATTRIBUTES:
             raise AttributeError(f"{name} is read-only.")
         delattr(self.wrapped_logger, name)
+
+    def __dir__(self) -> list[str]:
+        logger = object.__getattribute__(self, "wrapped_logger")
+        logger_attrs = set(dir(logger))
+        logger_attrs.update(ExtendedLogger._EXTENDED_ATTRIBUTES)
+        return sorted(logger_attrs)
 
     @typing.overload
     def error_and_exit(
