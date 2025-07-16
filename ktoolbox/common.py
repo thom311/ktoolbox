@@ -476,9 +476,13 @@ def path_norm(
         # the original instance.
         return path_orig
 
+    final_result: Any
     if isinstance(path_orig, pathlib.Path):
-        return (type(path_orig))(result)
-    return typing.cast(TPathNormPath, result)
+        final_result = (type(path_orig))(result)
+    else:
+        final_result = result
+
+    return typing.cast(TPathNormPath, final_result)
 
 
 def path_basedir(filename: str) -> tuple[str, str]:
@@ -829,7 +833,8 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
             f"There are left over keys {list(data)} to create dataclass {cls}"
         )
 
-    return cls(**create_kwargs)
+    result: Any = cls(**create_kwargs)
+    return typing.cast(T, result)
 
 
 def dataclass_from_json(cls: type[T], jsondata: str) -> T:
