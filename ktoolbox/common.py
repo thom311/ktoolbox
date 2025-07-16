@@ -2270,6 +2270,7 @@ class ExtendedLogger(logging.Logger):
         "wrapped_logger",
         "error_and_exit",
         "__dir__",
+        "__class__",
     )
 
     def __getattribute__(self, name: str) -> Any:
