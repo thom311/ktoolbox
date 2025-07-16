@@ -35,7 +35,7 @@ RETURNCODE_CANCELLED = 1025
 
 TERMINATE_KILL_WAIT = 1.0
 
-logger = logging.getLogger(__name__)
+logger = common.ExtendedLogger(__name__)
 
 _lock = threading.Lock()
 
