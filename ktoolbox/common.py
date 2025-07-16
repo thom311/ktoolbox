@@ -43,8 +43,6 @@ FATAL_EXIT_CODE = 255
 
 common_lock = threading.Lock()
 
-logger = logging.getLogger(__name__)
-
 
 PathType = Union[str, bytes, os.PathLike[str], os.PathLike[bytes]]
 
@@ -2201,15 +2199,11 @@ def log_config_logger(
             logger_level = min(logger_level, logfile_level)
 
     for logger in loggers:
-        if isinstance(logger, str):
-            logger = logging.getLogger(logger)
-        elif isinstance(logger, ExtendedLogger):
-            logger = logger.wrapped_logger
-
+        real_logger = ExtendedLogger.unwrap(logger)
         with common_lock:
-            _logHandler_attach(_LogHandlerStream, logger, level=level)
-            _logHandler_attach(_LogHandlerFile, logger, level=level)
-            logger.setLevel(logger_level)
+            _logHandler_attach(_LogHandlerStream, real_logger, level=level)
+            _logHandler_attach(_LogHandlerFile, real_logger, level=level)
+            real_logger.setLevel(logger_level)
 
 
 def log_argparse_add_argument_verbose(parser: "argparse.ArgumentParser") -> None:
@@ -2266,9 +2260,20 @@ class ExtendedLogger(logging.Logger):
         object.__setattr__(self, "wrapped_logger", logger)
         self.wrapped_logger: logging.Logger
 
+    @staticmethod
+    def unwrap(logger: Union[str, logging.Logger]) -> logging.Logger:
+        if isinstance(logger, str):
+            return logging.getLogger(logger)
+        if isinstance(logger, ExtendedLogger):
+            return logger.wrapped_logger
+        return logger
+
     _EXTENDED_ATTRIBUTES = (
         "wrapped_logger",
         "error_and_exit",
+        "unwrap",
+        "__dir__",
+        "__class__",
     )
 
     def __getattribute__(self, name: str) -> Any:
@@ -2288,6 +2293,12 @@ class ExtendedLogger(logging.Logger):
         if name in ExtendedLogger._EXTENDED_ATTRIBUTES:
             raise AttributeError(f"{name} is read-only.")
         delattr(self.wrapped_logger, name)
+
+    def __dir__(self) -> list[str]:
+        logger = object.__getattribute__(self, "wrapped_logger")
+        logger_attrs = set(dir(logger))
+        logger_attrs.update(ExtendedLogger._EXTENDED_ATTRIBUTES)
+        return sorted(logger_attrs)
 
     @typing.overload
     def error_and_exit(
@@ -2325,6 +2336,7 @@ class ExtendedLogger(logging.Logger):
         *,
         exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
+        backtrace_with_exception: bool = True,
         die_on_error: bool = True,
     ) -> Union[None, typing.NoReturn]:
         self.error(msg)
@@ -2347,9 +2359,23 @@ class ExtendedLogger(logging.Logger):
         if backtrace:
             import traceback
 
-            self.error(f"FATAL ERROR:\n{traceback.format_exc()}")
+            msg = "FATAL ERROR:\n"
+            if backtrace_with_exception:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                if exc_type is not None:
+                    # There's an active exception, format its traceback
+                    tb_str = "".join(
+                        traceback.format_exception(exc_type, exc_value, exc_tb)
+                    )
+                    msg = f"FATAL ERROR (with exception):\n{tb_str}\nException came from:\n\n"
+
+            msg += "".join(traceback.format_stack()[:-1])
+            self.error(msg)
 
         sys.exit(exit_code)
+
+
+logger = ExtendedLogger(__name__)
 
 
 class Cancellable:
