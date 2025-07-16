@@ -2199,15 +2199,11 @@ def log_config_logger(
             logger_level = min(logger_level, logfile_level)
 
     for logger in loggers:
-        if isinstance(logger, str):
-            logger = logging.getLogger(logger)
-        elif isinstance(logger, ExtendedLogger):
-            logger = logger.wrapped_logger
-
+        real_logger = ExtendedLogger.unwrap(logger)
         with common_lock:
-            _logHandler_attach(_LogHandlerStream, logger, level=level)
-            _logHandler_attach(_LogHandlerFile, logger, level=level)
-            logger.setLevel(logger_level)
+            _logHandler_attach(_LogHandlerStream, real_logger, level=level)
+            _logHandler_attach(_LogHandlerFile, real_logger, level=level)
+            real_logger.setLevel(logger_level)
 
 
 def log_argparse_add_argument_verbose(parser: "argparse.ArgumentParser") -> None:
@@ -2264,9 +2260,18 @@ class ExtendedLogger(logging.Logger):
         object.__setattr__(self, "wrapped_logger", logger)
         self.wrapped_logger: logging.Logger
 
+    @staticmethod
+    def unwrap(logger: Union[str, logging.Logger]) -> logging.Logger:
+        if isinstance(logger, str):
+            return logging.getLogger(logger)
+        if isinstance(logger, ExtendedLogger):
+            return logger.wrapped_logger
+        return logger
+
     _EXTENDED_ATTRIBUTES = (
         "wrapped_logger",
         "error_and_exit",
+        "unwrap",
         "__dir__",
         "__class__",
     )
