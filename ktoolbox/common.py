@@ -43,8 +43,6 @@ FATAL_EXIT_CODE = 255
 
 common_lock = threading.Lock()
 
-logger = logging.getLogger(__name__)
-
 
 PathType = Union[str, bytes, os.PathLike[str], os.PathLike[bytes]]
 
@@ -2358,6 +2356,9 @@ class ExtendedLogger(logging.Logger):
             self.error(f"FATAL ERROR:\n{traceback.format_exc()}")
 
         sys.exit(exit_code)
+
+
+logger = ExtendedLogger(__name__)
 
 
 class Cancellable:
