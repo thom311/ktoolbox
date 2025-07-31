@@ -1100,7 +1100,6 @@ class StructParseVarg:
         return StructParsePopContext(self.vdict, self.yamlpath, key)
 
     def for_name(self, key: str = "name") -> StructParsePopContext:
-        return self.for_key(key)
         """
         Same as for_key(), but defaults to a key "name".
 
@@ -1108,7 +1107,7 @@ class StructParseVarg:
 
            foo = structparse_pop_str_name(varg.for_name())
         """
-        return StructParsePopContext(self.vdict, self.yamlpath, key)
+        return self.for_key(key)
 
     def skip_check_empty(self) -> None:
         """
