@@ -1764,7 +1764,13 @@ def etc_hosts_update_file(
 
 class Serial:
     def __init__(self, port: str, baudrate: int = 115200):
-        import serial
+        try:
+            import serial
+        except ImportError as e:
+            raise ImportError(
+                "pyserial is required for the Serial class. "
+                "Install with: pip install 'ktoolbox[pyserial]'"
+            ) from e
 
         self.port = port
         self._ser = serial.Serial(port, baudrate=baudrate, timeout=0)

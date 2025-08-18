@@ -1229,7 +1229,13 @@ class RemoteHost(Host):
                 raise ValueError("Unknown USER to login at RemoteHost()")
             logins2 = (AutoLogin(user),)
 
-        import paramiko
+        try:
+            import paramiko
+        except ImportError as e:
+            raise ImportError(
+                "paramiko is required for the RemoteHost class. "
+                "Install with: pip install 'ktoolbox[paramiko]'"
+            ) from e
 
         super().__init__(sudo=sudo)
         self.host = host

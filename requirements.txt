@@ -1,4 +1,1 @@
-PyYAML
-jinja2
-paramiko
-pyserial
+# No core dependencies - all features are optional

@@ -9,10 +9,14 @@ description = "Utility library"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "PyYAML",
-    "paramiko",
-    "pyserial",
 ]
+
+[project.optional-dependencies]
+PyYAML = ["PyYAML"]
+jinja2 = ["jinja2"]
+paramiko = ["paramiko"]
+pyserial = ["pyserial"]
+all = ["PyYAML", "jinja2", "paramiko", "pyserial"]
 
 [tool.setuptools.package-data]
 ktoolbox = ["py.typed"]

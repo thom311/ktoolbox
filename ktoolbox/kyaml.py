@@ -1,11 +1,18 @@
 import pathlib
 import typing
-import yaml
 
 from typing import Any
 from typing import Union
 
 from . import common
+
+try:
+    import yaml
+except ImportError as e:
+    raise ImportError(
+        "PyYAML is required for the kyaml module. "
+        "Install with: pip install 'ktoolbox[PyYAML]'"
+    ) from e
 
 
 class YamlDumper(yaml.SafeDumper):
