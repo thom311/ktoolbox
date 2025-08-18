@@ -1,1 +1,1 @@
-paramiko
+# No core dependencies - all features are optional

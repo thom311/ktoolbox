@@ -3,6 +3,7 @@ black
 flake8
 jinja2
 mypy
+paramiko
 pyserial
 PyYAML
 pytest
