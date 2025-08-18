@@ -28,7 +28,6 @@ from typing import Literal
 from typing import Optional
 from typing import TypeVar
 from typing import Union
-from typing import cast
 
 if typing.TYPE_CHECKING:
     # https://github.com/python/typeshed/tree/main/stdlib/_typeshed#api-stability
@@ -595,7 +594,11 @@ def enum_convert_list(
                         return int(s)
                     except Exception:
                         pass
-                    return cast(int, enum_convert(enum_type, s).value)
+                    enum_val = enum_convert(enum_type, s)
+                    v2 = int(enum_val.value)
+                    if v2 != enum_val.value:
+                        raise ValueError()
+                    return v2
 
                 try:
                     # Try to detect this as range. Both end points may either by
