@@ -3,6 +3,7 @@ black
 flake8
 jinja2
 mypy
+pyserial
 pytest
 types-PyYAML
 types-paramiko

@@ -11,11 +11,11 @@ requires-python = ">=3.9"
 dependencies = [
     "PyYAML",
     "paramiko",
-    "pyserial",
 ]
 
 [project.optional-dependencies]
 jinja2 = ["jinja2"]
+pyserial = ["pyserial"]
 
 [tool.setuptools.package-data]
 ktoolbox = ["py.typed"]
