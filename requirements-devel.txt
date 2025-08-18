@@ -1,6 +1,7 @@
 -r requirements.txt
 black
 flake8
+jinja2
 mypy
 pytest
 types-PyYAML

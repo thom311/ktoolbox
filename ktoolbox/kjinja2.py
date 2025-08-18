@@ -1,4 +1,3 @@
-import jinja2
 import pathlib
 import typing
 
@@ -8,6 +7,14 @@ from typing import Optional
 from typing import Union
 
 from . import common
+
+try:
+    import jinja2
+except ImportError as e:
+    raise ImportError(
+        "jinja2 is required for the kjinja2 module. "
+        "Install with: pip install 'ktoolbox[jinja2]'"
+    ) from e
 
 
 def render_data(
