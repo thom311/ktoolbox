@@ -778,7 +778,11 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
             if is_dataclass(ck_type) and isinstance(value, dict):
                 assert isinstance(ck_type, type)
                 return dataclass_from_dict(ck_type, value)
-            if actual_type is None and issubclass(ck_type, Enum):
+            if (
+                actual_type is None
+                and isinstance(ck_type, type)
+                and issubclass(ck_type, Enum)
+            ):
                 return enum_convert(ck_type, value)
             if ck_type is float and isinstance(value, int):
                 return float(value)
