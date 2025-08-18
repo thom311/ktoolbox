@@ -9,11 +9,11 @@ description = "Utility library"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "PyYAML",
     "paramiko",
 ]
 
 [project.optional-dependencies]
+PyYAML = ["PyYAML"]
 jinja2 = ["jinja2"]
 pyserial = ["pyserial"]
 

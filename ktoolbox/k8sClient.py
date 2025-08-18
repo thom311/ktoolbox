@@ -4,13 +4,20 @@ import os
 import random
 import shlex
 import typing
-import yaml
 
 from collections.abc import Iterable
 from typing import Union
 
 from . import common
 from . import host
+
+try:
+    import yaml
+except ImportError as e:
+    raise ImportError(
+        "PyYAML is required for the k8sClient module. "
+        "Install with: pip install 'ktoolbox[PyYAML]'"
+    ) from e
 
 
 logger = common.ExtendedLogger(__name__)
