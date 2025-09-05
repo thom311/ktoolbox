@@ -1417,6 +1417,75 @@ def test_future_thread() -> None:
     assert th.result_full() == (True, None)
 
 
+def test_future_thread_async() -> None:
+    import asyncio
+
+    async def test1() -> None:
+        cancellable = common.Cancellable()
+
+        def _cancel_in_background(cancellable: common.Cancellable) -> None:
+            def _background_cancel() -> None:
+                time.sleep(random.uniform(0, 0.1))
+                cancellable.cancel()
+
+            threading.Thread(
+                target=_background_cancel,
+                daemon=True,
+            ).start()
+
+        def _assert_result_is_cancelled(result: Optional[host.Result]) -> None:
+            assert result is host.Result.CANCELLED or result == host.Result(
+                out="",
+                err="",
+                returncode=-15,
+                cancelled=True,
+            )
+
+        def _assert_ft_running_and_cancel(ft: common.FutureThread[host.Result]) -> None:
+            assert ft.poll() is None
+            _assert_result_is_cancelled(ft.result(cancel=True))
+
+        def _assert_ft_is_cancelled(ft: common.FutureThread[host.Result]) -> None:
+            _assert_result_is_cancelled(ft.poll())
+
+        _cancel_in_background(cancellable)
+        ft = host.local.run_in_thread("sleep 10000", cancellable=cancellable)
+        result = await ft
+        _assert_result_is_cancelled(result)
+
+        ft = host.local.run_in_thread("echo hi")
+        result = await ft
+        assert result == host.Result(out="hi\n", err="", returncode=0)
+
+        ft = host.local.run_in_thread("sleep 1000")
+        with pytest.raises(asyncio.TimeoutError):
+            await ft.async_result(timeout=0.01)
+        _assert_ft_is_cancelled(ft)
+
+        ft = host.local.run_in_thread("sleep 1000")
+        with pytest.raises(asyncio.TimeoutError):
+            await ft.async_result(timeout=0.01, cancel=False)
+        _assert_ft_running_and_cancel(ft)
+
+        ft = host.local.run_in_thread("sleep 1000")
+        task = asyncio.create_task(ft.async_result())
+        await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        _assert_ft_is_cancelled(ft)
+
+        ft = host.local.run_in_thread("sleep 1000")
+        task = asyncio.create_task(ft.async_result(cancel=False))
+        await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        _assert_ft_running_and_cancel(ft)
+
+    asyncio.run(test1())
+
+
 def test_path_norm() -> None:
 
     @dataclasses.dataclass

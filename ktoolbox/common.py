@@ -2675,6 +2675,34 @@ class FutureThread(typing.Generic[T1]):
     def join_and_result(self, *, cancel: bool = False) -> T1:
         return self.result(cancel=cancel)
 
+    async def async_result(
+        self,
+        *,
+        timeout: Optional[float] = None,
+        cancel: bool = True,
+    ) -> Optional[T1]:
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        fut = asyncio.wrap_future(self.future, loop=loop)
+        fut_shielded = asyncio.shield(fut)
+
+        try:
+            if timeout is None:
+                return await fut_shielded
+            else:
+                return await asyncio.wait_for(fut_shielded, timeout=timeout)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            if cancel:
+                self.cancel()
+                completed, _ = self.result_full(timeout=0.0)
+                if not completed:
+                    await loop.run_in_executor(None, self.result)
+            raise
+
+    def __await__(self) -> typing.Generator[Any, None, Optional[T1]]:
+        return self.async_result(cancel=True).__await__()
+
 
 _thread_list: list[Union[threading.Thread, FutureThread[Any]]] = []
 
