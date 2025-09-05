@@ -2699,9 +2699,20 @@ def run_main(
     error_code: int = EX_SOFTWARE,
     logger: Optional[logging.Logger] = logger,
     error_code_keyboard_interrupt: Optional[int] = None,
+    cleanup: Optional[typing.Callable[[], None]] = None,
 ) -> typing.NoReturn:
     try:
-        exit_code = main_fcn()
+        got_exception: Optional[BaseException] = None
+        try:
+            exit_code = main_fcn()
+        except BaseException as e:
+            got_exception = e
+            raise
+        finally:
+            if cleanup is not None:
+                if got_exception and logger is not None:
+                    logger.info(f"Got exception {got_exception}. Run cleanup first")
+                cleanup()
     except Exception:
         import traceback
 
@@ -2710,11 +2721,11 @@ def run_main(
         else:
             logger.error(f"FATAL ERROR:\n{traceback.format_exc()}")
 
-        sys.exit(error_code)
+        exit_code = error_code
     except KeyboardInterrupt:
         if error_code_keyboard_interrupt is None:
             raise
-        sys.exit(error_code_keyboard_interrupt)
+        exit_code = error_code_keyboard_interrupt
 
     if exit_code is None:
         exit_code = 0
