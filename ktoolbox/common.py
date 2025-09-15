@@ -2319,6 +2319,7 @@ class ExtendedLogger(logging.Logger):
         *,
         exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
+        backtrace_with_exception: bool = True,
         die_on_error: Literal[False],
     ) -> None: ...
 
@@ -2329,6 +2330,7 @@ class ExtendedLogger(logging.Logger):
         *,
         exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
+        backtrace_with_exception: bool = True,
         die_on_error: Literal[True] = True,
     ) -> typing.NoReturn: ...
 
@@ -2339,6 +2341,7 @@ class ExtendedLogger(logging.Logger):
         *,
         exit_code: int = FATAL_EXIT_CODE,
         backtrace: bool = True,
+        backtrace_with_exception: bool = True,
         die_on_error: bool = True,
     ) -> Union[None, typing.NoReturn]: ...
 
@@ -2351,8 +2354,6 @@ class ExtendedLogger(logging.Logger):
         backtrace_with_exception: bool = True,
         die_on_error: bool = True,
     ) -> Union[None, typing.NoReturn]:
-        self.error(msg)
-
         if not die_on_error:
             # Usually, error_and_exit() does what it says (it exists).
             #
@@ -2366,23 +2367,32 @@ class ExtendedLogger(logging.Logger):
             #
             # With the die_on_error argument, the caller can downgrade the
             # error_and_exit() to a plain error().
+            self.error(msg)
             return None
 
-        if backtrace:
-            import traceback
-
-            msg = "FATAL ERROR:\n"
-            if backtrace_with_exception:
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                if exc_type is not None:
-                    # There's an active exception, format its traceback
-                    tb_str = "".join(
-                        traceback.format_exception(exc_type, exc_value, exc_tb)
-                    )
-                    msg = f"FATAL ERROR (with exception):\n{tb_str}\nException came from:\n\n"
-
-            msg += "".join(traceback.format_stack()[:-1])
+        try:
             self.error(msg)
+        except Exception:
+            pass
+
+        if backtrace:
+            try:
+                import traceback
+
+                msg = "FATAL ERROR:\n"
+                if backtrace_with_exception:
+                    exc_type, exc_value, exc_tb = sys.exc_info()
+                    if exc_type is not None:
+                        # There's an active exception, format its traceback
+                        tb_str = "".join(
+                            traceback.format_exception(exc_type, exc_value, exc_tb)
+                        )
+                        msg = f"FATAL ERROR (with exception):\n{tb_str}\nException came from:\n\n"
+
+                msg += "".join(traceback.format_stack()[:-1])
+                self.error(msg)
+            except Exception:
+                pass
 
         sys.exit(exit_code)
 
