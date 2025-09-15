@@ -1780,3 +1780,8 @@ def test_validate_dns_name() -> None:
 
     with pytest.raises(ValueError):
         common.validate_dns_name(123)  # type: ignore
+
+
+def test_sed_escape_repl() -> None:
+    assert common.sed_escape_repl("") == ""
+    assert common.sed_escape_repl("abc\\d/x&dd") == "abc\\\\d\\/x\\&dd"

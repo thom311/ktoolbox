@@ -185,6 +185,18 @@ def as_regex(
     raise ValueError("not a valid regex pattern")
 
 
+def sed_escape_repl(s: str, *, delimiter: str = "/") -> str:
+    # This is to escape strings in sed argument like
+    # f"s/pattern/{replacement}/".
+    s = s.replace("\\", "\\\\")
+    s = s.replace("&", "\\&")
+    if delimiter:
+        if len(delimiter) != 1:
+            raise ValueError("sed_escape_repl() requires a delimiter of length 1")
+        s = s.replace(delimiter, "\\" + delimiter)
+    return s
+
+
 def validate_dns_name(name: str) -> bool:
     if not isinstance(name, str):
         raise ValueError("dns name must be a string")
