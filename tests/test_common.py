@@ -8,7 +8,9 @@ import pathlib
 import pytest
 import random
 import re
+import shlex
 import socket
+import string
 import sys
 import threading
 import time
@@ -1785,3 +1787,43 @@ def test_validate_dns_name() -> None:
 def test_sed_escape_repl() -> None:
     assert common.sed_escape_repl("") == ""
     assert common.sed_escape_repl("abc\\d/x&dd") == "abc\\\\d\\/x\\&dd"
+
+    def _test_pattern(replacement: str) -> None:
+        cmd = ["sed", f"s/PATTERN/{common.sed_escape_repl(replacement)}/"]
+        ret = host.local.run(f"printf '%s' '[PATTERN]' | {shlex.join(cmd)}")
+        assert ret == host.Result(f"[{replacement}]", "", 0)
+
+        arg = f"s//{common.sed_escape_repl(replacement)}/"
+        assert os.system(f"sed {shlex.quote(arg)} /dev/null") == 0
+
+    _test_pattern("")
+    _test_pattern("x")
+    _test_pattern("x\n")
+    _test_pattern("simple")
+    _test_pattern("with/slash")
+    _test_pattern("with&and&multiple&")
+    _test_pattern("back\\slash")
+    _test_pattern("mix\\&/\\\\")
+    _test_pattern("ends_with_backslash\\\\")
+    _test_pattern("newline\ninside")
+    _test_pattern("multiple\nnewlines\nhere")
+    _test_pattern("weird /&\\ combination")
+    _test_pattern("\n&/\\\n&/\\\n&/\\")
+    _test_pattern("unicode: üñîçødë & / \\")
+    _test_pattern("\1\2\3\4\5\6\7")
+    _test_pattern("tabs\tand\ttabs")
+    _test_pattern("quotes'\"`")
+    _test_pattern("spaces and    multiple   spaces")
+    _test_pattern("mix1234567890!@#$%^&*()_+-=[]{}|;:,<.>/?")
+    _test_pattern("edge-case\\&/\n\\&/\n")
+    _test_pattern("repeated_specials" * 5)
+    _test_pattern("\\" * 10 + "&/" * 5 + "\n" * 3)
+    _test_pattern("emoji 😀 😁 😂 & / \\ \n")
+    _test_pattern("control_chars" + "".join(chr(i) for i in range(1, 32)))
+    for i in range(10):
+        _test_pattern(
+            "".join(
+                random.choice(string.ascii_letters + string.digits + "\\&/\n")
+                for _ in range(50)
+            )
+        )

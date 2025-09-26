@@ -188,12 +188,12 @@ def as_regex(
 def sed_escape_repl(s: str, *, delimiter: str = "/") -> str:
     # This is to escape strings in sed argument like
     # f"s/pattern/{replacement}/".
-    s = s.replace("\\", "\\\\")
-    s = s.replace("&", "\\&")
-    if delimiter:
-        if len(delimiter) != 1:
-            raise ValueError("sed_escape_repl() requires a delimiter of length 1")
-        s = s.replace(delimiter, "\\" + delimiter)
+    if len(delimiter) != 1:
+        raise ValueError("sed_escape_repl() requires a delimiter of length 1")
+    if delimiter in "\\&\n":
+        raise ValueError("sed_escape_repl() has invalid delimiter")
+    for ch in f"\\&\n{delimiter}":
+        s = s.replace(ch, f"\\{ch}")
     return s
 
 
