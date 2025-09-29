@@ -1775,7 +1775,13 @@ def etc_hosts_update_file(
 
 
 class Serial:
-    def __init__(self, port: str, baudrate: int = 115200):
+    def __init__(
+        self,
+        port: str,
+        baudrate: int = 115200,
+        *,
+        log_stream: Optional[typing.IO[bytes]] = None,
+    ):
         try:
             import serial
         except ImportError as e:
@@ -1788,6 +1794,7 @@ class Serial:
         self._ser = serial.Serial(port, baudrate=baudrate, timeout=0)
         self._bin_buf = b""
         self._str_buf: Optional[str] = None
+        self._log_stream = log_stream
 
     @property
     def buffer(self) -> str:
@@ -1825,6 +1832,13 @@ class Serial:
                 logger.debug(
                     f"serial[{self.port}]: read buffer ({len(self._bin_buf)} + {len(buf)} bytes): {repr(s)}"
                 )
+                if self._log_stream is not None:
+                    try:
+                        self._log_stream.write(buf)
+                    except Exception as e:
+                        logger.warning(
+                            f"serial[{self.port}]: failed to write to log stream: {e}"
+                        )
                 if not self._bin_buf:
                     self._str_buf = s
                 elif (
