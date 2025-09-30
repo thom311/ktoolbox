@@ -2585,6 +2585,7 @@ class FutureThread(typing.Generic[T1]):
         *,
         timeout: Optional[float] = None,
         cancel: bool = False,
+        cancel_on_timeout: bool = False,
     ) -> Optional[T1]:
         with self._lock:
             if not self._is_started:
@@ -2596,11 +2597,15 @@ class FutureThread(typing.Generic[T1]):
             try:
                 return self.future.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
+                if cancel_on_timeout:
+                    return self.result(cancel=True)
                 return None
         else:
             assert thread is not None
             thread.join(timeout=timeout)
             if thread.is_alive():
+                if cancel_on_timeout:
+                    return self.result(cancel=True)
                 return None
             return self.future.result()
 
