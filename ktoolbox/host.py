@@ -1199,14 +1199,31 @@ class _Login(ABC):
         pass
 
 
-@dataclass(frozen=True, **common.KW_ONLY_DATACLASS)
+@dataclass(frozen=True)
 class AutoLogin(_Login):
+    password: Optional[str] = dataclasses.field(default=None, repr=False)
+
     def _login(self, client: "paramiko.SSHClient", host: str) -> None:
         client.connect(
             host,
             username=self.user,
+            password=self.password,
             look_for_keys=True,
             allow_agent=True,
+        )
+
+
+@dataclass(frozen=True)
+class PasswordLogin(_Login):
+    password: str = dataclasses.field(repr=False)
+
+    def _login(self, client: "paramiko.SSHClient", host: str) -> None:
+        client.connect(
+            host,
+            username=self.user,
+            password=self.password,
+            look_for_keys=False,
+            allow_agent=False,
         )
 
 
