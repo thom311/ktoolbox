@@ -1413,6 +1413,9 @@ def test_future_thread() -> None:
                 break
             assert time.monotonic() < end_time
 
+    th = common.FutureThread(lambda th: None, start=True)
+    assert th.result_full() == (True, None)
+
 
 def test_path_norm() -> None:
 

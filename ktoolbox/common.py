@@ -2570,6 +2570,25 @@ class FutureThread(typing.Generic[T1]):
         *,
         timeout: typing.Literal[None] = None,
         cancel: bool = False,
+        cancel_on_timeout: bool = False,
+    ) -> T1: ...
+
+    @typing.overload
+    def result(
+        self,
+        *,
+        timeout: Optional[float] = None,
+        cancel: typing.Literal[True],
+        cancel_on_timeout: bool = False,
+    ) -> T1: ...
+
+    @typing.overload
+    def result(
+        self,
+        *,
+        timeout: Optional[float] = None,
+        cancel: bool = False,
+        cancel_on_timeout: typing.Literal[True],
     ) -> T1: ...
 
     @typing.overload
@@ -2578,6 +2597,7 @@ class FutureThread(typing.Generic[T1]):
         *,
         timeout: Optional[float],
         cancel: bool = False,
+        cancel_on_timeout: bool = False,
     ) -> Optional[T1]: ...
 
     def result(
@@ -2587,6 +2607,20 @@ class FutureThread(typing.Generic[T1]):
         cancel: bool = False,
         cancel_on_timeout: bool = False,
     ) -> Optional[T1]:
+        completed, res = self.result_full(
+            timeout=timeout,
+            cancel=cancel,
+            cancel_on_timeout=cancel_on_timeout,
+        )
+        return res
+
+    def result_full(
+        self,
+        *,
+        timeout: Optional[float] = None,
+        cancel: bool = False,
+        cancel_on_timeout: bool = False,
+    ) -> tuple[bool, Optional[T1]]:
         with self._lock:
             if not self._is_started:
                 raise RuntimeError("thread is not yet started")
@@ -2595,19 +2629,30 @@ class FutureThread(typing.Generic[T1]):
             thread = self._thread
         if self._executor is not None:
             try:
-                return self.future.result(timeout=timeout)
+                return True, self.future.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
-                if cancel_on_timeout:
-                    return self.result(cancel=True)
-                return None
+                pass
         else:
             assert thread is not None
             thread.join(timeout=timeout)
-            if thread.is_alive():
-                if cancel_on_timeout:
-                    return self.result(cancel=True)
-                return None
-            return self.future.result()
+            if not thread.is_alive():
+                return True, self.future.result()
+
+        if not cancel and not cancel_on_timeout:
+            # We got a timeout. But also did the caller not request to cancel.
+            # We thus are not yet complete. We signal that to the caller.
+            return False, None
+
+        # We got a timeout, but the caller requested to cancel the operation.
+        # In this case, we now block to wait for completion. The timeout is
+        # irrelevant. The thread MUST complete.
+        if cancel:
+            # We already cancelled in the current call above. All that is left
+            # is to block indefinitely.
+            return self.result_full()
+
+        # Cancel the operation and wait for the result.
+        return self.result_full(cancel=True)
 
     def poll(
         self,
