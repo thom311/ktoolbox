@@ -515,7 +515,7 @@ class Host(ABC):
                 _handle_line = _handle_line_log
 
             def _handle_log(level: int, msg: str) -> None:
-                if level >= log_level:
+                if log_level >= 0 and level >= log_level:
                     logger.log(
                         level,
                         f"{log_prefix}cmd[{log_id};{self.pretty_str()}]: {msg}",
