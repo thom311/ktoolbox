@@ -128,3 +128,7 @@ def test_validate_ipaddr() -> None:
     assert netdev.validate_ipaddr("::0:1") == ("::1", socket.AF_INET6)
     assert netdev.validate_ipaddr("192.168.4.5") == ("192.168.4.5", socket.AF_INET)
     assert netdev.validate_ipaddr(" 192.168.4.5") == ("192.168.4.5", socket.AF_INET)
+
+
+def test_wait_point() -> None:
+    assert netdev.wait_ping("localhost") == "localhost"

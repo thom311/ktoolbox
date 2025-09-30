@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 import re
 import socket
 import sys
+import time
+import typing
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -1115,6 +1118,72 @@ def device_infos_find(
         lst = [di for di in lst if _match(di)]
 
     return lst
+
+
+def wait_ping(
+    *hosts: str,
+    addr_family: Optional[Union[str, int]] = None,
+    timeout: float = 2.0,
+    log_level: int = logging.DEBUG,
+) -> Optional[str]:
+    addr_family = validate_addr_family(addr_family, with_unspec=True)
+
+    def _ping_args_parse_host(h: str) -> tuple[str, tuple[str, ...]]:
+        if h.startswith("ip4:"):
+            return h[4:], ("-4",)
+        if h.startswith("ip6:"):
+            return h[4:], ("-6",)
+        if h.startswith("ip:"):
+            return h[3:], ()
+        ping_args: tuple[str, ...] = ()
+        if addr_family == socket.AF_INET:
+            ping_args = ("-4",)
+        elif addr_family == socket.AF_INET6:
+            ping_args = ("-6",)
+        return h, ping_args
+
+    def _ping_cmd(h: str) -> tuple[str, ...]:
+        real_host, ping_args = _ping_args_parse_host(h)
+        return (
+            "ping",
+            *ping_args,
+            "-W",
+            str(round(timeout, 2)),
+            "-c",
+            "1",
+            real_host,
+        )
+
+    threads = [
+        host.local.run_in_thread(
+            _ping_cmd(h),
+            log_level=-1,
+            log_level_result=log_level,
+            user_data=h,
+        )
+        for h in hosts
+    ]
+
+    if len(threads) > 1:
+        end_time = time.monotonic() + timeout
+        sleep_time = 0.005
+        while time.monotonic() <= end_time:
+            poll_results = [th.poll() for th in threads]
+            if all(r is not None for r in poll_results) or any(poll_results):
+                break
+            time.sleep(sleep_time)
+            sleep_time = min(sleep_time * 1.5, 0.05)
+    else:
+        [th.result(timeout=timeout, cancel_on_timeout=True) for th in threads]
+
+    results = [
+        (
+            th.result(cancel=True),
+            typing.cast(str, th.user_data),
+        )
+        for th in threads
+    ]
+    return next((h for res, h in results if res), None)
 
 
 def main() -> None:
