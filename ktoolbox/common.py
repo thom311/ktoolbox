@@ -2876,6 +2876,40 @@ def getenv_config(name: str) -> Optional[str]:
     return os.getenv(name)
 
 
+@typing.overload
+def ensure_utf8_bytes(text: Union[str, bytes]) -> bytes: ...
+
+
+@typing.overload
+def ensure_utf8_bytes(text: Optional[Union[str, bytes]]) -> Optional[bytes]: ...
+
+
+def ensure_utf8_bytes(text: Optional[Union[str, bytes]]) -> Optional[bytes]:
+    if text is None:
+        return None
+    if isinstance(text, bytes):
+        return text
+    return text.encode("utf-8")
+
+
+def base64_encode(
+    text: Union[str, bytes],
+    *,
+    altchars: Optional[Union[str, bytes]] = None,
+    prefix: Optional[str] = None,
+) -> str:
+    import base64
+
+    altchars_bin = ensure_utf8_bytes(altchars)
+    text_bin = ensure_utf8_bytes(text)
+    base64_bin = base64.b64encode(text_bin, altchars=altchars_bin)
+    base64_string = base64_bin.decode("utf-8")
+
+    if prefix:
+        return f"{prefix}{base64_string}"
+    return base64_string
+
+
 def time_monotonic(now: Optional[float]) -> float:
     if now is None:
         return time.monotonic()

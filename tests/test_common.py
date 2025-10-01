@@ -1899,3 +1899,23 @@ def test_sed_escape_repl() -> None:
                 for _ in range(50)
             )
         )
+
+
+def test_base64_encode() -> None:
+    assert common.base64_encode("") == ""
+    assert common.base64_encode("abc") == "YWJj"
+    assert common.base64_encode("abc", prefix="data:;base64,") == "data:;base64,YWJj"
+
+    assert common.base64_encode(b"") == ""
+    assert common.base64_encode(b"abc") == "YWJj"
+    assert common.base64_encode(b"abc", prefix="data:;base64,") == "data:;base64,YWJj"
+
+    str1 = "'ῥY"
+    assert str1.encode() == b"'\xe1\xbf\xa5Y"
+    assert common.base64_encode(str1) == "J+G/pVk="
+    assert common.base64_encode(str1.encode()) == "J+G/pVk="
+    assert common.base64_encode(str1.encode(), altchars="%-") == "J%G-pVk="
+    assert common.base64_encode(str1.encode(), altchars=b"%-") == "J%G-pVk="
+
+    with pytest.raises(Exception):
+        assert common.base64_encode("", altchars="%")
