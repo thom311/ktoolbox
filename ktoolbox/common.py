@@ -1781,6 +1781,7 @@ class Serial:
         baudrate: int = 115200,
         *,
         log_stream: Optional[typing.IO[bytes]] = None,
+        own_log_stream: bool = False,
     ):
         try:
             import serial
@@ -1795,6 +1796,7 @@ class Serial:
         self._bin_buf = b""
         self._str_buf: Optional[str] = None
         self._log_stream = log_stream
+        self._own_log_stream = own_log_stream
 
     @property
     def buffer(self) -> str:
@@ -1808,6 +1810,8 @@ class Serial:
 
     def close(self) -> None:
         self._ser.close()
+        if self._own_log_stream and self._log_stream is not None:
+            self._log_stream.close()
 
     def send(self, msg: str, *, sleep: float = 1) -> None:
         logger.debug(f"serial[{self.port}]: send {repr(msg)}")
@@ -1940,7 +1944,7 @@ class Serial:
         exc_value: Optional[BaseException],
         traceback: Optional["TracebackType"],
     ) -> None:
-        self._ser.close()
+        self.close()
 
 
 def _log_parse_level_str(lvl: str) -> Optional[int]:
