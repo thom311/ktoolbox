@@ -2910,6 +2910,12 @@ def base64_encode(
     return base64_string
 
 
+def uuid4() -> str:
+    import uuid
+
+    return str(uuid.uuid4())
+
+
 def time_monotonic(now: Optional[float]) -> float:
     if now is None:
         return time.monotonic()

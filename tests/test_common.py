@@ -1919,3 +1919,7 @@ def test_base64_encode() -> None:
 
     with pytest.raises(Exception):
         assert common.base64_encode("", altchars="%")
+
+
+def test_uuid4() -> None:
+    assert common.uuid4() != ""
