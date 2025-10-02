@@ -2823,12 +2823,20 @@ def run_main(
         got_exception: Optional[BaseException] = None
         try:
             exit_code = main_fcn()
+        except SystemExit:
+            # A SystemExit is a "regular" exit from the function. Below, we
+            # already make the (arbitrary) choice to only log the message "Got
+            # exception" on non-regular exit. On normal exit we will still call
+            # cleanup(), but we will no log a message about it.
+            raise
         except BaseException as e:
+            # We use this only for logging a message that we are going to call
+            # cleanup.
             got_exception = e
             raise
         finally:
             if cleanup is not None:
-                if got_exception and logger is not None:
+                if got_exception is not None and logger is not None:
                     logger.info(f"Got exception {got_exception}. Run cleanup first")
                 cleanup()
     except Exception:
