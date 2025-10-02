@@ -1923,3 +1923,115 @@ def test_base64_encode() -> None:
 
 def test_uuid4() -> None:
     assert common.uuid4() != ""
+
+
+def test_immutable_dataclass() -> None:
+    lock = threading.Lock()
+
+    @dataclasses.dataclass(frozen=True)
+    class TestClass(common.ImmutableDataclass):
+        name: str
+
+    obj = TestClass(name="test")
+
+    obj._field_set_once("foo", "bar")
+    assert obj._field_get("foo") == "bar"
+
+    with pytest.raises(ValueError, match="Cannot init field foo more than once"):
+        obj._field_set_once("foo", "baz")
+
+    with pytest.raises(KeyError, match="Cannot access key missing"):
+        obj._field_get("missing")
+
+    obj._field_set_once("num", 42)
+    assert obj._field_get("num", int) == 42
+
+    with pytest.raises(ValueError, match="has unexpected type 'int', expected 'str'"):
+        obj._field_get("num", str)
+
+    assert obj._field_check("foo") == ("bar", True)
+
+    assert obj._field_check("missing") == (None, False)
+
+    assert obj._field_check("num", int) == (42, True)
+
+    with pytest.raises(ValueError, match="has unexpected type 'int', expected 'str'"):
+        obj._field_check("num", str)
+
+    obj._field_set_once("nullable", None)
+    assert obj._field_get("nullable") is None
+    assert obj._field_check("nullable") == (None, True)
+
+    obj2 = TestClass(name="concurrent")
+    errors = []
+
+    def set_field(key: str, val: int) -> None:
+        try:
+            obj2._field_set_once(key, val)
+        except ValueError as e:
+            with lock:
+                errors.append(e)
+
+    threads = [
+        threading.Thread(target=lambda: set_field("concurrent", i)) for i in range(10)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(errors) == 9
+    assert obj2._field_get("concurrent") in range(10)
+
+    obj3 = TestClass(name="lazy")
+    counter = {"count": 0}
+
+    def init_cache() -> dict[str, int]:
+        counter["count"] += 1
+        return {"initialized": counter["count"]}
+
+    cache1 = obj3._field_get("cache", dict, on_missing=init_cache)
+    assert cache1 == {"initialized": 1}
+    assert counter["count"] == 1
+
+    cache2 = obj3._field_get("cache", dict, on_missing=init_cache)
+    assert cache2 == {"initialized": 1}
+    assert cache2 is cache1
+    assert counter["count"] == 1
+
+    with pytest.raises(ValueError, match="has unexpected type 'dict', expected 'str'"):
+        obj3._field_get("cache", str, on_missing=init_cache)  # type: ignore[arg-type]
+
+    def init_wrong_type() -> str:
+        return "wrong"
+
+    with pytest.raises(ValueError, match="has unexpected type 'str', expected 'int'"):
+        obj3._field_get("wrong", int, on_missing=init_wrong_type)  # type: ignore[arg-type]
+
+    with pytest.raises(KeyError, match="Cannot access key wrong"):
+        obj3._field_get("wrong")
+
+    obj4 = TestClass(name="concurrent_init")
+    init_count = {"count": 0}
+
+    def concurrent_init() -> int:
+        with lock:
+            init_count["count"] += 1
+            return init_count["count"]
+
+    results = []
+
+    def get_or_init() -> None:
+        val = obj4._field_get("lazy", int, on_missing=concurrent_init)
+        with lock:
+            results.append(val)
+
+    threads = [threading.Thread(target=get_or_init) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert init_count["count"] == 1
+    assert len(set(results)) == 1
+    assert results[0] == 1

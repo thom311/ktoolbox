@@ -15,6 +15,7 @@ import time
 import typing
 import weakref
 
+from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Mapping
 from collections.abc import Sequence
@@ -3008,3 +3009,98 @@ class NextExpiry:
         if expiry is None:
             return None
         return expiry - now
+
+
+@dataclass(frozen=True)
+class ImmutableDataclass:
+    _lock: threading.Lock = dataclasses.field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+    )
+
+    _fields: dict[str, typing.Any] = dataclasses.field(
+        default_factory=dict,
+        init=False,
+    )
+
+    def _field_set_once(self, key: str, val: typing.Any) -> None:
+        with self._lock:
+            if key in self._fields:
+                raise ValueError(f"Cannot init field {key} more than once")
+            self._fields[key] = val
+
+    @typing.overload
+    def _field_check(
+        self,
+        key: str,
+        valtype: Literal[None] = None,
+    ) -> tuple[typing.Any, bool]: ...
+
+    @typing.overload
+    def _field_check(
+        self,
+        key: str,
+        valtype: type[T],
+    ) -> tuple[Optional[T], bool]: ...
+
+    def _field_check(
+        self,
+        key: str,
+        valtype: Optional[type[T]] = None,
+    ) -> tuple[typing.Any, bool]:
+        with self._lock:
+            if key not in self._fields:
+                return (None, False)
+            val = self._fields[key]
+            if valtype is not None and not isinstance(val, valtype):
+                raise ValueError(
+                    f"The value for key {key} has unexpected type {type(val).__name__!r}, expected {valtype.__name__!r}"
+                )
+            return (val, True)
+
+    @typing.overload
+    def _field_get(
+        self,
+        key: str,
+        valtype: Literal[None] = None,
+        *,
+        on_missing: Optional[Callable[[], T]] = None,
+    ) -> typing.Any: ...
+
+    @typing.overload
+    def _field_get(
+        self,
+        key: str,
+        valtype: type[T],
+        *,
+        on_missing: Optional[Callable[[], T]] = None,
+    ) -> T: ...
+
+    def _field_get(
+        self,
+        key: str,
+        valtype: Optional[type[T]] = None,
+        *,
+        on_missing: Optional[Callable[[], T]] = None,
+    ) -> typing.Any:
+        with self._lock:
+            is_new = key not in self._fields
+            if not is_new:
+                val = self._fields[key]
+            elif on_missing is None:
+                raise KeyError(f"Cannot access key {key} that was not initialized")
+            else:
+                # Note: on_missing() is called while holding the lock. Calling external
+                # callbacks while holding locks is error prone to deadlock. We still do
+                # it here, because it seems more important to support init-once than
+                # guard against deadlock. The caller needs to be careful that the
+                # callback doesn't deadlock.
+                val = on_missing()
+            if valtype is not None and not isinstance(val, valtype):
+                raise ValueError(
+                    f"The value for key {key} has unexpected type {type(val).__name__!r}, expected {valtype.__name__!r}"
+                )
+            if is_new:
+                self._fields[key] = val
+        return val
