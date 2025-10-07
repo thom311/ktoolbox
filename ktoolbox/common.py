@@ -2812,6 +2812,37 @@ def argparse_regex_type(value: str) -> re.Pattern[str]:
         raise argparse.ArgumentTypeError(f"Invalid regex pattern: {e}")
 
 
+@dataclass(frozen=True, repr=False)
+class CleanupList:
+    _lock: threading.Lock = dataclasses.field(
+        default_factory=threading.Lock,
+        init=False,
+    )
+
+    _list: list[typing.Callable[[], None]] = dataclasses.field(
+        default_factory=list,
+        init=False,
+    )
+
+    def add(self, action: typing.Callable[[], None]) -> None:
+        with self._lock:
+            self._list.append(action)
+
+    def cleanup(self) -> None:
+        while True:
+            with self._lock:
+                if not self._list:
+                    return
+                action = self._list.pop()
+            try:
+                action()
+            except Exception:
+                logger.error("cleanup action failed", exc_info=True)
+
+    def __call__(self) -> None:
+        self.cleanup()
+
+
 # Error codes from <sysexits.h>
 EX_SOFTWARE = 70
 EX_CONFIG = 78

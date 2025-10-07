@@ -2035,3 +2035,35 @@ def test_immutable_dataclass() -> None:
     assert init_count["count"] == 1
     assert len(set(results)) == 1
     assert results[0] == 1
+
+
+def test_cleanup_list() -> None:
+
+    _count = 0
+
+    cleanup = common.CleanupList()
+
+    def _cleanup_callback(expected: int) -> typing.Callable[[], None]:
+        def _c() -> None:
+            nonlocal _count
+            assert _count == expected
+            _count += 1
+
+        return _c
+
+    cleanup.add(_cleanup_callback(2))
+    cleanup.add(_cleanup_callback(1))
+
+    def _cleanup_with_exception() -> None:
+        raise RuntimeError("an exception was raised")
+
+    cleanup.add(_cleanup_with_exception)
+    cleanup.add(_cleanup_callback(0))
+
+    with pytest.raises(SystemExit):
+        common.run_main(
+            lambda: None,
+            cleanup=cleanup,
+        )
+
+    assert _count == 3
