@@ -1868,6 +1868,8 @@ class Serial:
         self,
         pattern: Union[str, re.Pattern[str]],
         timeout: float = 30,
+        *,
+        verbose: bool = True,
     ) -> str: ...
 
     @typing.overload
@@ -1875,6 +1877,8 @@ class Serial:
         self,
         pattern: None,
         timeout: float = 30,
+        *,
+        verbose: bool = True,
     ) -> None: ...
 
     @typing.overload
@@ -1882,12 +1886,16 @@ class Serial:
         self,
         pattern: Optional[Union[str, re.Pattern[str]]],
         timeout: float = 30,
+        *,
+        verbose: bool = True,
     ) -> Optional[str]: ...
 
     def expect(
         self,
         pattern: Optional[Union[str, re.Pattern[str]]],
         timeout: float = 30,
+        *,
+        verbose: bool = True,
     ) -> Optional[str]:
         import select
 
@@ -1927,9 +1935,10 @@ class Serial:
             if remaining_time <= 0:
                 if pattern_re is not None:
                     s = self._bin_buf.decode("utf-8", errors="surrogateescape")
-                    logger.debug(
-                        f"serial[{self.port}]: did not find expected message {repr(pattern)} (buffer content is {repr(s)})"
-                    )
+                    if verbose:
+                        logger.debug(
+                            f"serial[{self.port}]: did not find expected message {repr(pattern)} (buffer content is {repr(s)})"
+                        )
                     raise RuntimeError(
                         f"Did not receive expected message {repr(pattern)} within timeout (buffer content is {repr(s)})"
                     )
