@@ -2072,8 +2072,6 @@ def test_cleanup_list() -> None:
 
     _count = 0
 
-    cleanup = common.CleanupList()
-
     def _cleanup_callback(expected: int) -> typing.Callable[[], None]:
         def _c() -> None:
             nonlocal _count
@@ -2082,10 +2080,17 @@ def test_cleanup_list() -> None:
 
         return _c
 
+    cleanup = common.CleanupList(
+        _cleanup_callback(5),
+        _cleanup_callback(4),
+    )
+
+    cleanup.add(_cleanup_callback(3))
     cleanup.add(_cleanup_callback(2))
-    cleanup.add(_cleanup_callback(1))
 
     def _cleanup_with_exception() -> None:
+        nonlocal _count
+        _count += 1
         raise RuntimeError("an exception was raised")
 
     cleanup.add(_cleanup_with_exception)
@@ -2097,4 +2102,4 @@ def test_cleanup_list() -> None:
             cleanup=cleanup,
         )
 
-    assert _count == 3
+    assert _count == 6

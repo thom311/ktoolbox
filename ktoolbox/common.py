@@ -2837,26 +2837,24 @@ def argparse_regex_type(value: str) -> re.Pattern[str]:
         raise argparse.ArgumentTypeError(f"Invalid regex pattern: {e}")
 
 
-@dataclass(frozen=True, repr=False)
+@dataclass(frozen=True, init=False, repr=False)
 class CleanupList:
-    _lock: threading.Lock = dataclasses.field(
-        default_factory=threading.Lock,
-        init=False,
-    )
+    _lock: threading.Lock = dataclasses.field(init=False)
+    _list: list[typing.Callable[[], None]] = dataclasses.field(init=False)
 
-    _list: list[typing.Callable[[], None]] = dataclasses.field(
-        default_factory=list,
-        init=False,
-    )
+    def __init__(self, *actions: typing.Callable[[], None]):
+        object.__setattr__(self, "_list", [])
+        object.__setattr__(self, "_lock", threading.Lock())
+        self._list.extend(actions)
 
     @property
     def has_cleanup_tasks(self) -> bool:
         with self._lock:
             return bool(self._list)
 
-    def add(self, action: typing.Callable[[], None]) -> None:
+    def add(self, *actions: typing.Callable[[], None]) -> None:
         with self._lock:
-            self._list.append(action)
+            self._list.extend(actions)
 
     def cleanup(self) -> None:
         while True:
