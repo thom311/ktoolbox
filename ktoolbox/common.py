@@ -2849,6 +2849,11 @@ class CleanupList:
         init=False,
     )
 
+    @property
+    def has_cleanup_tasks(self) -> bool:
+        with self._lock:
+            return bool(self._list)
+
     def add(self, action: typing.Callable[[], None]) -> None:
         with self._lock:
             self._list.append(action)
@@ -2901,9 +2906,16 @@ def run_main(
             got_exception = e
             raise
         finally:
-            if cleanup is not None:
-                if got_exception is not None and logger is not None:
-                    logger.info(f"Got exception {got_exception}. Run cleanup first")
+            if cleanup is None:
+                pass
+            elif isinstance(cleanup, CleanupList) and not cleanup.has_cleanup_tasks:
+                pass
+            else:
+                if logger is not None:
+                    if got_exception is not None:
+                        logger.info(f"Run cleanup for exception {got_exception}")
+                    else:
+                        logger.debug("Run cleanup")
                 cleanup()
     except Exception:
         import traceback
