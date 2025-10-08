@@ -36,6 +36,7 @@ if typing.TYPE_CHECKING:
     from _typeshed import DataclassInstance
     from types import TracebackType
     import argparse
+    import serial
 
 
 FATAL_EXIT_CODE = 255
@@ -1778,7 +1779,7 @@ def etc_hosts_update_file(
 class Serial:
     def __init__(
         self,
-        port: str,
+        port: Union[str, "serial.Serial"],
         baudrate: int = 115200,
         *,
         log_stream: Optional[typing.IO[bytes]] = None,
@@ -1792,8 +1793,21 @@ class Serial:
                 "Install with: pip install 'ktoolbox[pyserial]'"
             ) from e
 
-        self.port = port
-        self._ser = serial.Serial(port, baudrate=baudrate, timeout=0)
+        real_port: str
+        real_ser: serial.Serial
+
+        if isinstance(port, str):
+            real_port = port
+            real_ser = serial.Serial(port, baudrate=baudrate, timeout=0)
+        else:
+            # The caller can also pass in a serial.serial_for_url() instance
+            # that they allocated themselves.
+            real_ser = port
+            real_ser.timeout = 0.0
+            real_port = real_ser.port or "unspecified"
+
+        self.port = real_port
+        self._ser = real_ser
         self._bin_buf = b""
         self._str_buf: Optional[str] = None
         self._log_stream = log_stream
