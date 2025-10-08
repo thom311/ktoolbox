@@ -1832,7 +1832,7 @@ class Serial:
         self,
         msg: str,
         *,
-        sleep: float = 1.0,
+        sleep: float = 0.0,
     ) -> None:
         logger.debug(f"serial[{self.port}]: send {repr(msg)}")
         self._ser.write(msg.encode("utf-8", errors="surrogateescape"))
