@@ -36,6 +36,7 @@ if typing.TYPE_CHECKING:
     from _typeshed import DataclassInstance
     from types import TracebackType
     import argparse
+    import serial
 
 
 FATAL_EXIT_CODE = 255
@@ -1778,7 +1779,7 @@ def etc_hosts_update_file(
 class Serial:
     def __init__(
         self,
-        port: str,
+        port: Union[str, "serial.Serial"],
         baudrate: int = 115200,
         *,
         log_stream: Optional[typing.IO[bytes]] = None,
@@ -1792,8 +1793,21 @@ class Serial:
                 "Install with: pip install 'ktoolbox[pyserial]'"
             ) from e
 
-        self.port = port
-        self._ser = serial.Serial(port, baudrate=baudrate, timeout=0)
+        real_port: str
+        real_ser: serial.Serial
+
+        if isinstance(port, str):
+            real_port = port
+            real_ser = serial.Serial(port, baudrate=baudrate, timeout=0)
+        else:
+            # The caller can also pass in a serial.serial_for_url() instance
+            # that they allocated themselves.
+            real_ser = port
+            real_ser.timeout = 0.0
+            real_port = real_ser.port or "unspecified"
+
+        self.port = real_port
+        self._ser = real_ser
         self._bin_buf = b""
         self._str_buf: Optional[str] = None
         self._log_stream = log_stream
@@ -1814,10 +1828,15 @@ class Serial:
         if self._own_log_stream and self._log_stream is not None:
             self._log_stream.close()
 
-    def send(self, msg: str, *, sleep: float = 1) -> None:
+    def send(
+        self,
+        msg: str,
+        *,
+        sleep: float = 0.0,
+    ) -> None:
         logger.debug(f"serial[{self.port}]: send {repr(msg)}")
         self._ser.write(msg.encode("utf-8", errors="surrogateescape"))
-        if sleep > 0:
+        if sleep > 0.0:
             self.expect(pattern=None, timeout=sleep)
 
     def read_all(self, *, max_read: Optional[int] = None) -> int:
@@ -1867,7 +1886,7 @@ class Serial:
     def expect(
         self,
         pattern: Union[str, re.Pattern[str]],
-        timeout: float = 30,
+        timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
     ) -> str: ...
@@ -1876,7 +1895,7 @@ class Serial:
     def expect(
         self,
         pattern: None,
-        timeout: float = 30,
+        timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
     ) -> None: ...
@@ -1885,7 +1904,7 @@ class Serial:
     def expect(
         self,
         pattern: Optional[Union[str, re.Pattern[str]]],
-        timeout: float = 30,
+        timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
     ) -> Optional[str]: ...
@@ -1893,13 +1912,13 @@ class Serial:
     def expect(
         self,
         pattern: Optional[Union[str, re.Pattern[str]]],
-        timeout: float = 30,
+        timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
     ) -> Optional[str]:
         import select
 
-        end_timestamp = time.monotonic() + timeout
+        start_timestamp = time.monotonic()
 
         # We use DOTALL like pexpect does.
         # If you need something else, compile the pattern yourself.
@@ -1908,7 +1927,9 @@ class Serial:
         pattern_re = as_regex(pattern, flags=re.DOTALL)
 
         if pattern_re is not None:
-            logger.debug(f"serial[{self.port}]: expect message {repr(pattern)}")
+            logger.debug(
+                f"serial[{self.port}]: expect message {repr(pattern)} (timeout {timeout})"
+            )
 
         while True:
             self.read_all()
@@ -1925,24 +1946,28 @@ class Serial:
                     )
                     assert self._bin_buf.startswith(consumed_bytes)
                     logger.debug(
-                        f"serial[{self.port}]: found expected message {len(consumed_bytes)} bytes, {len(self._bin_buf) - len(consumed_bytes)} bytes remaning"
+                        f"serial[{self.port}]: found expected message {len(consumed_bytes)} bytes, {len(self._bin_buf) - len(consumed_bytes)} bytes remaning (took {time.monotonic() - start_timestamp:.4f} seconds)"
                     )
                     self._str_buf = buffer[end_idx:]
                     self._bin_buf = self._bin_buf[len(consumed_bytes) :]
                     return consumed_chars
 
-            remaining_time = end_timestamp - time.monotonic()
-            if remaining_time <= 0:
+            remaining_time = None
+            if timeout is not None:
+                remaining_time = (start_timestamp + timeout) - time.monotonic()
+
+            if remaining_time is not None and remaining_time <= 0.0:
                 if pattern_re is not None:
                     s = self._bin_buf.decode("utf-8", errors="surrogateescape")
                     if verbose:
                         logger.debug(
-                            f"serial[{self.port}]: did not find expected message {repr(pattern)} (buffer content is {repr(s)})"
+                            f"serial[{self.port}]: did not find expected message {repr(pattern)} after {time.monotonic() - start_timestamp:.4f} seconds (buffer content is {repr(s)})"
                         )
                     raise RuntimeError(
                         f"Did not receive expected message {repr(pattern)} within timeout (buffer content is {repr(s)})"
                     )
                 return None
+
             _, _, _ = select.select([self._ser], [], [], remaining_time)
 
     def __enter__(self) -> "Serial":

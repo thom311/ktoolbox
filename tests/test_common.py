@@ -650,7 +650,7 @@ def test_etc_hosts_update() -> None:
     )
 
 
-def test_serial() -> None:
+def test_serial_class() -> None:
     try:
         import serial
     except ModuleNotFoundError:
@@ -658,6 +658,37 @@ def test_serial() -> None:
 
     with pytest.raises(serial.serialutil.SerialException):
         common.Serial("")
+
+    with socket.socket() as server_socket:
+        server_socket.bind(("localhost", 0))
+        server_socket.listen(1)
+        port = server_socket.getsockname()[1]
+
+        serial_port = serial.serial_for_url(f"socket://localhost:{port}")
+
+        client_socket, _ = server_socket.accept()
+
+        with (
+            client_socket,
+            common.Serial(serial_port) as ser,
+        ):
+            ser.send("hello", sleep=0)
+
+            assert client_socket.recv(1024) == b"hello"
+
+            client_socket.sendall("message_1".encode())
+
+            m = ser.expect("_")
+            assert m == "message_"
+
+            m0 = ser.expect(None, timeout=0.0)
+            assert m0 is None
+
+            m = ser.expect(".+", timeout=0.0)
+            assert m == "1"
+
+            with pytest.raises(RuntimeError):
+                ser.expect(".+", timeout=0.01)
 
 
 def _pargs(
