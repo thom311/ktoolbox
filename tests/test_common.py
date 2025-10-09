@@ -1998,10 +1998,10 @@ def test_immutable_dataclass() -> None:
     obj._field_set_once("foo", "bar")
     assert obj._field_get("foo") == "bar"
 
-    with pytest.raises(ValueError, match="Cannot init field foo more than once"):
+    with pytest.raises(ValueError, match="Cannot set field 'foo' that is already set"):
         obj._field_set_once("foo", "baz")
 
-    with pytest.raises(KeyError, match="Cannot access key missing"):
+    with pytest.raises(KeyError, match="Cannot access key 'missing'"):
         obj._field_get("missing")
 
     obj._field_set_once("num", 42)
@@ -2069,7 +2069,7 @@ def test_immutable_dataclass() -> None:
     with pytest.raises(ValueError, match="has unexpected type 'str', expected 'int'"):
         obj3._field_get("wrong", int, on_missing=init_wrong_type)  # type: ignore[arg-type]
 
-    with pytest.raises(KeyError, match="Cannot access key wrong"):
+    with pytest.raises(KeyError, match="Cannot access key 'wrong'"):
         obj3._field_get("wrong")
 
     obj4 = TestClass(name="concurrent_init")
@@ -2096,6 +2096,49 @@ def test_immutable_dataclass() -> None:
     assert init_count["count"] == 1
     assert len(set(results)) == 1
     assert results[0] == 1
+
+    obj5 = TestClass(name="reset")
+
+    with pytest.raises(
+        ValueError, match="Cannot initialize field 'foo' that is not yet set"
+    ):
+        obj5._field_set("foo", None)
+
+    assert obj5._field_set("foo", None, allow_missing=True) == (None, False)
+
+    with pytest.raises(ValueError, match="Cannot set field 'foo' that is already set"):
+        obj5._field_set("foo", 3)
+
+    assert obj5._field_set("foo", 3, allow_exists=True) == (None, True)
+
+    with pytest.raises(ValueError, match="Cannot clear field 'bar' that is not set"):
+        obj5._field_set("bar", common.MISSING)
+
+    obj5._field_set("bar", "value", allow_missing=True)
+    assert obj5._field_get("bar") == "value"
+
+    with pytest.raises(ValueError, match="Cannot clear field 'bar' that is set"):
+        obj5._field_set("bar", common.MISSING)
+
+    obj5._field_unset("bar", valtype=str)
+    with pytest.raises(KeyError):
+        obj5._field_get("bar")
+
+    obj5._field_set("num_field", 123, allow_missing=True)
+    with pytest.raises(ValueError, match="has unexpected type 'int', expected 'str'"):
+        obj5._field_unset("num_field", valtype=str)
+
+    with pytest.raises(
+        ValueError, match="Cannot clear field 'nonexistent' that is not set"
+    ):
+        obj5._field_set("nonexistent", common.MISSING, allow_exists=False)
+
+    with pytest.raises(
+        ValueError, match="Cannot clear field 'nonexistent' that is not set"
+    ):
+        obj5._field_unset("nonexistent")
+
+    obj5._field_unset("num_field", valtype=int)
 
 
 def test_cleanup_list() -> None:

@@ -3113,11 +3113,141 @@ class ImmutableDataclass:
         init=False,
     )
 
-    def _field_set_once(self, key: str, val: typing.Any) -> None:
+    def _fields_validate(
+        self,
+        key: str,
+        *,
+        valtype: Optional[type[T]],
+        val: typing.Any,
+        is_new: bool,
+    ) -> None:
+        if not key or not isinstance(key, str):
+            raise ValueError("Invalid key: must be a string")
+        if valtype is not None and not isinstance(val, valtype):
+            raise ValueError(
+                f"The {'' if is_new else 'set '}value for key {key!r} has unexpected type {type(val).__name__!r}, expected {valtype.__name__!r}"
+            )
+        if isinstance(val, _MISSING_TYPE):
+            raise ValueError(
+                f"The {'' if is_new else 'set '}value for key {key!r} cannot be set to MISSING"
+            )
+
+    def _field_notify_set(
+        self,
+        key: str,
+        old_val: Union[_MISSING_TYPE, typing.Any],
+        val: Union[_MISSING_TYPE, typing.Any],
+    ) -> None:
+        pass
+
+    @typing.overload
+    def _field_set(
+        self,
+        key: str,
+        val: Union[_MISSING_TYPE, typing.Any],
+        *,
+        valtype: typing.Literal[None] = None,
+        allow_missing: bool = False,
+        allow_exists: bool = False,
+    ) -> tuple[typing.Any, bool]: ...
+
+    @typing.overload
+    def _field_set(
+        self,
+        key: str,
+        val: Union[_MISSING_TYPE, T],
+        *,
+        valtype: type[T],
+        allow_missing: bool = False,
+        allow_exists: bool = False,
+    ) -> tuple[T, bool]: ...
+
+    @typing.overload
+    def _field_set(
+        self,
+        key: str,
+        val: Union[_MISSING_TYPE, typing.Any],
+        *,
+        valtype: Optional[type[T]] = None,
+        allow_missing: bool = False,
+        allow_exists: bool = False,
+    ) -> tuple[typing.Any, bool]: ...
+
+    def _field_set(
+        self,
+        key: str,
+        val: Union[_MISSING_TYPE, typing.Any],
+        *,
+        valtype: Optional[type[T]] = None,
+        allow_missing: bool = False,
+        allow_exists: bool = False,
+    ) -> tuple[typing.Any, bool]:
+        has_new = not isinstance(val, _MISSING_TYPE)
+        if has_new:
+            self._fields_validate(key, valtype=valtype, val=val, is_new=True)
         with self._lock:
-            if key in self._fields:
-                raise ValueError(f"Cannot init field {key} more than once")
-            self._fields[key] = val
+            old_val, has_old = dict_check(self._fields, key, default_value=MISSING)
+
+            if has_old:
+                self._fields_validate(key, valtype=valtype, val=old_val, is_new=False)
+
+            if has_old:
+                if not allow_exists:
+                    if has_new:
+                        raise ValueError(
+                            f"Cannot set field {key!r} that is already set"
+                        )
+                    else:
+                        raise ValueError(f"Cannot clear field {key!r} that is set")
+            else:
+                if not allow_missing:
+                    if has_new:
+                        raise ValueError(
+                            f"Cannot initialize field {key!r} that is not yet set"
+                        )
+                    else:
+                        raise ValueError(f"Cannot clear field {key!r} that is not set")
+
+            if has_new:
+                self._fields[key] = val
+            elif has_old:
+                del self._fields[key]
+
+            self._field_notify_set(key, old_val, val)
+
+            if has_old:
+                return old_val, True
+            return None, False
+
+    def _field_set_once(
+        self,
+        key: str,
+        val: typing.Any,
+        *,
+        valtype: Optional[type[T]] = None,
+    ) -> None:
+        self._field_set(
+            key,
+            val,
+            valtype=valtype,
+            allow_missing=True,
+            allow_exists=False,
+        )
+
+    def _field_unset(
+        self,
+        key: str,
+        *,
+        valtype: Optional[type[T]] = None,
+        allow_missing: bool = False,
+    ) -> None:
+        self._field_set(
+            key,
+            MISSING,
+            valtype=valtype,
+            allow_missing=allow_missing,
+            allow_exists=True,
+        )
 
     @typing.overload
     def _field_check(
@@ -3139,14 +3269,10 @@ class ImmutableDataclass:
         valtype: Optional[type[T]] = None,
     ) -> tuple[typing.Any, bool]:
         with self._lock:
-            if key not in self._fields:
-                return (None, False)
-            val = self._fields[key]
-            if valtype is not None and not isinstance(val, valtype):
-                raise ValueError(
-                    f"The value for key {key} has unexpected type {type(val).__name__!r}, expected {valtype.__name__!r}"
-                )
-            return (val, True)
+            val, has = dict_check(self._fields, key)
+            if has:
+                self._fields_validate(key, valtype=valtype, val=val, is_new=False)
+            return (val, has)
 
     @typing.overload
     def _field_get(
@@ -3174,22 +3300,20 @@ class ImmutableDataclass:
         on_missing: Optional[Callable[[], T]] = None,
     ) -> typing.Any:
         with self._lock:
-            is_new = key not in self._fields
-            if not is_new:
-                val = self._fields[key]
-            elif on_missing is None:
-                raise KeyError(f"Cannot access key {key} that was not initialized")
-            else:
+            val, has = dict_check(self._fields, key)
+            if not has:
+                if on_missing is None:
+                    raise KeyError(
+                        f"Cannot access key {key!r} that was not initialized"
+                    )
                 # Note: on_missing() is called while holding the lock. Calling external
                 # callbacks while holding locks is error prone to deadlock. We still do
                 # it here, because it seems more important to support init-once than
                 # guard against deadlock. The caller needs to be careful that the
                 # callback doesn't deadlock.
                 val = on_missing()
-            if valtype is not None and not isinstance(val, valtype):
-                raise ValueError(
-                    f"The value for key {key} has unexpected type {type(val).__name__!r}, expected {valtype.__name__!r}"
-                )
-            if is_new:
+            self._fields_validate(key, valtype=valtype, val=val, is_new=not has)
+            if not has:
                 self._fields[key] = val
+                self._field_notify_set(key, MISSING, val)
         return val
