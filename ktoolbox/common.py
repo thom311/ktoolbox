@@ -737,6 +737,19 @@ def dict_get_typed(
     return v
 
 
+def dict_check(
+    d: Mapping[T3, T],
+    key: T3,
+    *,
+    default_value: Optional[T2] = None,
+) -> tuple[Union[Optional[T], Optional[T2]], bool]:
+    try:
+        val = d[key]
+    except KeyError:
+        return default_value, False
+    return val, True
+
+
 def serialize_enum(
     data: Union[Enum, dict[Any, Any], list[Any], Any],
 ) -> Union[str, dict[Any, Any], list[Any], Any]:

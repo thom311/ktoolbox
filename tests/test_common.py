@@ -1956,6 +1956,36 @@ def test_uuid4() -> None:
     assert common.uuid4() != ""
 
 
+def test_dict_check() -> None:
+    d = {
+        "foo": 0.1,
+    }
+
+    assert common.dict_check(d, "foo") == (0.1, True)
+    assert common.dict_check(d, "xx") == (None, False)
+
+    if sys.version_info >= (3, 11):
+        typing.assert_type(common.dict_check(d, "bogus"), tuple[Optional[float], bool])
+
+    assert common.dict_check(d, "foo", default_value=5) == (0.1, True)
+    assert common.dict_check(d, "xx", default_value=5) == (5, False)
+
+    if sys.version_info >= (3, 11):
+        typing.assert_type(
+            common.dict_check(d, "bogus", default_value=5),
+            tuple[Optional[Union[float, int]], bool],
+        )
+
+    assert common.dict_check(d, "foo", default_value=5.0) == (0.1, True)
+    assert common.dict_check(d, "xx", default_value=5.0) == (5.0, False)
+
+    if sys.version_info >= (3, 11):
+        typing.assert_type(
+            common.dict_check(d, "bogus", default_value=5.0),
+            tuple[Optional[float], bool],
+        )
+
+
 def test_immutable_dataclass() -> None:
     lock = threading.Lock()
 
