@@ -2140,6 +2140,25 @@ def test_immutable_dataclass() -> None:
 
     obj5._field_unset("num_field", valtype=int)
 
+    if sys.version_info >= (3, 11):
+        obj5._field_set_once("key", 5)
+        typing.assert_type(
+            obj5._field_set("key", common.MISSING, valtype=int, allow_exists=True),
+            tuple[int, typing.Literal[True]],
+        )
+
+        obj5._field_set_once("key", 5)
+        typing.assert_type(
+            obj5._field_set(
+                "key",
+                common.MISSING,
+                valtype=int,
+                allow_missing=True,
+                allow_exists=True,
+            ),
+            tuple[Optional[int], bool],
+        )
+
 
 def test_cleanup_list() -> None:
 

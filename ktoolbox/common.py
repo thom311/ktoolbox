@@ -3158,9 +3158,20 @@ class ImmutableDataclass:
         val: Union[_MISSING_TYPE, T],
         *,
         valtype: type[T],
+        allow_missing: Literal[False] = False,
+        allow_exists: bool = False,
+    ) -> tuple[T, Literal[True]]: ...
+
+    @typing.overload
+    def _field_set(
+        self,
+        key: str,
+        val: Union[_MISSING_TYPE, T],
+        *,
+        valtype: type[T],
         allow_missing: bool = False,
         allow_exists: bool = False,
-    ) -> tuple[T, bool]: ...
+    ) -> tuple[Optional[T], bool]: ...
 
     @typing.overload
     def _field_set(
