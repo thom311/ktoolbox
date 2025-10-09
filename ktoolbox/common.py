@@ -3300,6 +3300,7 @@ class ImmutableDataclass:
         valtype: Literal[None] = None,
         *,
         on_missing: Optional[Callable[[], T]] = None,
+        allow_exists: bool = True,
     ) -> tuple[typing.Any, bool]: ...
 
     @typing.overload
@@ -3309,6 +3310,7 @@ class ImmutableDataclass:
         valtype: type[T],
         *,
         on_missing: Optional[Callable[[], T]] = None,
+        allow_exists: bool = True,
     ) -> tuple[T, bool]: ...
 
     def _field_get_or_create(
@@ -3317,10 +3319,14 @@ class ImmutableDataclass:
         valtype: Optional[type[T]] = None,
         *,
         on_missing: Optional[Callable[[], T]] = None,
+        allow_exists: bool = True,
     ) -> tuple[typing.Any, bool]:
         with self._lock:
             val, has = dict_check(self._fields, key)
-            if not has:
+            if has:
+                if not allow_exists:
+                    raise ValueError(f"Key {key!r} is already initialized")
+            else:
                 if on_missing is None:
                     raise KeyError(
                         f"Cannot access key {key!r} that was not initialized"

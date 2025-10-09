@@ -2090,6 +2090,32 @@ def test_immutable_dataclass() -> None:
     )
     assert (result3, was_created3) == ("pre-set", False)
 
+    obj3b_init = TestClass(name="test_get_or_create_init_once")
+    counter_b_init = {"count": 0}
+
+    def init_once() -> str:
+        counter_b_init["count"] += 1
+        return f"initialized-{counter_b_init['count']}"
+
+    result_init1, was_created_init1 = obj3b_init._field_get_or_create(
+        "init_once", str, on_missing=init_once, allow_exists=False
+    )
+    assert (result_init1, was_created_init1) == ("initialized-1", True)
+    assert counter_b_init["count"] == 1
+
+    with pytest.raises(ValueError, match="Key 'init_once' is already initialized"):
+        obj3b_init._field_get_or_create(
+            "init_once", str, on_missing=init_once, allow_exists=False
+        )
+
+    assert counter_b_init["count"] == 1
+
+    result_init2, was_created_init2 = obj3b_init._field_get_or_create(
+        "init_once", str, on_missing=init_once, allow_exists=True
+    )
+    assert (result_init2, was_created_init2) == ("initialized-1", False)
+    assert counter_b_init["count"] == 1
+
     obj3c = TestClass(name="test_get_or_create_no_callback")
     with pytest.raises(KeyError, match="Cannot access key 'missing_field'"):
         obj3c._field_get_or_create("missing_field", str)
