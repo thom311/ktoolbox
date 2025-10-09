@@ -3294,6 +3294,51 @@ class ImmutableDataclass:
             return (val, has)
 
     @typing.overload
+    def _field_get_or_create(
+        self,
+        key: str,
+        valtype: Literal[None] = None,
+        *,
+        on_missing: Optional[Callable[[], T]] = None,
+    ) -> tuple[typing.Any, bool]: ...
+
+    @typing.overload
+    def _field_get_or_create(
+        self,
+        key: str,
+        valtype: type[T],
+        *,
+        on_missing: Optional[Callable[[], T]] = None,
+    ) -> tuple[T, bool]: ...
+
+    def _field_get_or_create(
+        self,
+        key: str,
+        valtype: Optional[type[T]] = None,
+        *,
+        on_missing: Optional[Callable[[], T]] = None,
+    ) -> tuple[typing.Any, bool]:
+        with self._lock:
+            val, has = dict_check(self._fields, key)
+            if not has:
+                if on_missing is None:
+                    raise KeyError(
+                        f"Cannot access key {key!r} that was not initialized"
+                    )
+                # Note: on_missing() is called while holding the lock. Calling external
+                # callbacks while holding locks is error prone to deadlock. We still do
+                # it here, because it seems more important to support init-once than
+                # guard against deadlock. The caller needs to be careful that the
+                # callback doesn't deadlock.
+                val = on_missing()
+            self._fields_validate(key, valtype=valtype, val=val, is_new=not has)
+            if not has:
+                self._fields[key] = val
+                self._field_notify_set(key, MISSING, val)
+        was_created = not has
+        return val, was_created
+
+    @typing.overload
     def _field_get(
         self,
         key: str,
@@ -3318,21 +3363,9 @@ class ImmutableDataclass:
         *,
         on_missing: Optional[Callable[[], T]] = None,
     ) -> typing.Any:
-        with self._lock:
-            val, has = dict_check(self._fields, key)
-            if not has:
-                if on_missing is None:
-                    raise KeyError(
-                        f"Cannot access key {key!r} that was not initialized"
-                    )
-                # Note: on_missing() is called while holding the lock. Calling external
-                # callbacks while holding locks is error prone to deadlock. We still do
-                # it here, because it seems more important to support init-once than
-                # guard against deadlock. The caller needs to be careful that the
-                # callback doesn't deadlock.
-                val = on_missing()
-            self._fields_validate(key, valtype=valtype, val=val, is_new=not has)
-            if not has:
-                self._fields[key] = val
-                self._field_notify_set(key, MISSING, val)
+        val, was_created = self._field_get_or_create(
+            key,
+            valtype,
+            on_missing=on_missing,
+        )
         return val

@@ -2063,6 +2063,69 @@ def test_immutable_dataclass() -> None:
     with pytest.raises(ValueError, match="has unexpected type 'dict', expected 'str'"):
         obj3._field_get("cache", str, on_missing=init_cache)  # type: ignore[arg-type]
 
+    obj3a = TestClass(name="test_get_or_create")
+    counter_a = {"count": 0}
+
+    def init_cache_a() -> dict[str, int]:
+        counter_a["count"] += 1
+        return {"value": counter_a["count"]}
+
+    result1, was_created1 = obj3a._field_get_or_create(
+        "cache_a", dict, on_missing=init_cache_a
+    )
+    assert (result1, was_created1) == ({"value": 1}, True)
+    assert counter_a["count"] == 1
+
+    result2, was_created2 = obj3a._field_get_or_create(
+        "cache_a", dict, on_missing=init_cache_a
+    )
+    assert (result2, was_created2) == ({"value": 1}, False)
+    assert result2 is result1
+    assert counter_a["count"] == 1
+
+    obj3b = TestClass(name="test_get_or_create_existing")
+    obj3b._field_set_once("existing", "pre-set")
+    result3, was_created3 = obj3b._field_get_or_create(
+        "existing", str, on_missing=lambda: "not-used"
+    )
+    assert (result3, was_created3) == ("pre-set", False)
+
+    obj3c = TestClass(name="test_get_or_create_no_callback")
+    with pytest.raises(KeyError, match="Cannot access key 'missing_field'"):
+        obj3c._field_get_or_create("missing_field", str)
+
+    obj3d = TestClass(name="test_concurrent_get_or_create")
+    create_count = {"count": 0}
+
+    def concurrent_create() -> int:
+        with lock:
+            create_count["count"] += 1
+            return create_count["count"]
+
+    create_results = []
+
+    def get_or_create_concurrent() -> None:
+        val, was_created = obj3d._field_get_or_create(
+            "lazy_field", int, on_missing=concurrent_create
+        )
+        with lock:
+            create_results.append((val, was_created))
+
+    threads_concurrent = [
+        threading.Thread(target=get_or_create_concurrent) for _ in range(10)
+    ]
+    for t in threads_concurrent:
+        t.start()
+    for t in threads_concurrent:
+        t.join()
+
+    assert create_count["count"] == 1
+    values = [v for v, _ in create_results]
+    assert len(set(values)) == 1
+    assert values[0] == 1
+    created_flags = [c for _, c in create_results]
+    assert sum(created_flags) == 1
+
     def init_wrong_type() -> str:
         return "wrong"
 
