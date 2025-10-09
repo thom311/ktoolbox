@@ -55,6 +55,7 @@ TOptionalBool = TypeVar("TOptionalBool", bound=Optional[bool])
 TOptionalFloat = TypeVar("TOptionalFloat", bound=Optional[float])
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
+T3 = TypeVar("T3")
 TAnyStr = TypeVar("TAnyStr", str, bytes)
 TCallable = typing.TypeVar("TCallable", bound=typing.Callable[..., typing.Any])
 TStructParseBaseNamed = typing.TypeVar(
