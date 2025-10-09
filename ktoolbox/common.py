@@ -3110,8 +3110,8 @@ class NextExpiry:
 
 @dataclass(frozen=True)
 class ImmutableDataclass:
-    _lock: threading.Lock = dataclasses.field(
-        default_factory=threading.Lock,
+    _lock: threading.RLock = dataclasses.field(
+        default_factory=threading.RLock,
         init=False,
         repr=False,
     )
