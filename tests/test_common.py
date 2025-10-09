@@ -2195,3 +2195,12 @@ def test_cleanup_list() -> None:
         )
 
     assert _count == 6
+
+
+def test_missing_type_repr() -> None:
+    assert repr(common.MISSING) == "MISSING"
+    assert str(common.MISSING) == "MISSING"
+
+    other_instance = common._MISSING_TYPE()
+    assert repr(other_instance).startswith("<ktoolbox.common._MISSING_TYPE object at ")
+    assert str(other_instance).startswith("<ktoolbox.common._MISSING_TYPE object at ")

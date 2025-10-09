@@ -71,7 +71,15 @@ TStructParseBaseNamed = typing.TypeVar(
 #
 # See also, dataclasses.MISSING and dataclasses._MISSING_TYPE
 class _MISSING_TYPE:
-    pass
+    def __repr__(self) -> str:
+        if self is MISSING:
+            return "MISSING"
+        return super().__repr__()
+
+    def __str__(self) -> str:
+        if self is MISSING:
+            return "MISSING"
+        return super().__str__()
 
 
 MISSING = _MISSING_TYPE()
