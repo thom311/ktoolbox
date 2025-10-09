@@ -3253,6 +3253,39 @@ class ImmutableDataclass:
             allow_exists=False,
         )
 
+    @typing.overload
+    def _field_init_once(
+        self,
+        key: str,
+        on_missing: Callable[[], T],
+        *,
+        valtype: type[T],
+    ) -> T: ...
+
+    @typing.overload
+    def _field_init_once(
+        self,
+        key: str,
+        on_missing: Callable[[], T],
+        *,
+        valtype: Optional[type[T]] = None,
+    ) -> typing.Any: ...
+
+    def _field_init_once(
+        self,
+        key: str,
+        on_missing: Callable[[], T],
+        *,
+        valtype: Optional[type[T]] = None,
+    ) -> typing.Any:
+        val, _ = self._field_get_or_create(
+            key,
+            valtype,
+            on_missing=on_missing,
+            allow_exists=False,
+        )
+        return val
+
     def _field_unset(
         self,
         key: str,

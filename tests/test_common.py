@@ -2116,6 +2116,22 @@ def test_immutable_dataclass() -> None:
     assert (result_init2, was_created_init2) == ("initialized-1", False)
     assert counter_b_init["count"] == 1
 
+    obj3b_init_once = TestClass(name="test_field_init_once")
+    counter_init_once = {"count": 0}
+
+    def create_value() -> str:
+        counter_init_once["count"] += 1
+        return f"value-{counter_init_once['count']}"
+
+    result1 = obj3b_init_once._field_init_once("lazy", create_value, valtype=str)
+    assert result1 == "value-1"
+    assert counter_init_once["count"] == 1
+
+    with pytest.raises(ValueError, match="Key 'lazy' is already initialized"):
+        obj3b_init_once._field_init_once("lazy", create_value, valtype=str)
+
+    assert counter_init_once["count"] == 1
+
     obj3c = TestClass(name="test_get_or_create_no_callback")
     with pytest.raises(KeyError, match="Cannot access key 'missing_field'"):
         obj3c._field_get_or_create("missing_field", str)
