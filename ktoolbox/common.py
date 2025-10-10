@@ -1964,8 +1964,8 @@ class Serial:
 
             if pattern_re is not None:
                 buffer = self.buffer
-                matches = re.finditer(pattern_re, buffer)
-                for match in matches:
+                match = re.search(pattern_re, buffer)
+                if match:
                     end_idx = match.end()
                     consumed_chars = buffer[:end_idx]
                     consumed_bytes = consumed_chars.encode(
