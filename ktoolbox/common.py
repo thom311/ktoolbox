@@ -1854,12 +1854,12 @@ class Serial:
         self,
         msg: str,
         *,
-        sleep: float = 0.0,
+        sleep: Optional[float] = None,
     ) -> None:
         logger.debug(f"serial[{self.port}]: send {repr(msg)}")
         self._ser.write(msg.encode("utf-8", errors="surrogateescape"))
-        if sleep > 0.0:
-            self.expect(pattern=None, timeout=sleep)
+        if sleep is not None:
+            self.sleep(sleep)
 
     def read_all(self, *, max_read: Optional[int] = None) -> int:
         byte_readcount = 0
@@ -2005,6 +2005,9 @@ class Serial:
                 return None
 
             _, _, _ = select.select([self._ser], [], [], remaining_time)
+
+    def sleep(self, timeout: float) -> None:
+        self.expect(None, timeout=timeout)
 
     def __enter__(self) -> "Serial":
         return self
