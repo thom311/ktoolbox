@@ -1904,6 +1904,8 @@ class Serial:
                 # The read data was appended to the internal self._bin_buf.
                 return byte_readcount
 
+    BACKLOG_SIZE_DEFAULT = 64 * 1024
+
     @typing.overload
     def expect(
         self,
@@ -1911,6 +1913,7 @@ class Serial:
         timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
+        backlog_size: int = BACKLOG_SIZE_DEFAULT,
     ) -> str: ...
 
     @typing.overload
@@ -1920,6 +1923,7 @@ class Serial:
         timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
+        backlog_size: int = BACKLOG_SIZE_DEFAULT,
     ) -> None: ...
 
     @typing.overload
@@ -1929,6 +1933,7 @@ class Serial:
         timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
+        backlog_size: int = BACKLOG_SIZE_DEFAULT,
     ) -> Optional[str]: ...
 
     def expect(
@@ -1937,6 +1942,7 @@ class Serial:
         timeout: Optional[float] = 30.0,
         *,
         verbose: bool = True,
+        backlog_size: int = BACKLOG_SIZE_DEFAULT,
     ) -> Optional[str]:
         import select
 
@@ -1954,7 +1960,7 @@ class Serial:
             )
 
         while True:
-            self.read_all()
+            self.read_all(max_read=4096)
 
             if pattern_re is not None:
                 buffer = self.buffer
@@ -1973,6 +1979,14 @@ class Serial:
                     self._str_buf = buffer[end_idx:]
                     self._bin_buf = self._bin_buf[len(consumed_bytes) :]
                     return consumed_chars
+
+            if backlog_size > 0 and len(self._bin_buf) > 2 * backlog_size:
+                consumed_len = len(self._bin_buf) - backlog_size
+                self._str_buf = None
+                self._bin_buf = self._bin_buf[consumed_len:]
+                logger.debug(
+                    f"serial[{self.port}]: drop excess {consumed_len} bytes, {len(self._bin_buf)} bytes remaning"
+                )
 
             remaining_time = None
             if timeout is not None:
