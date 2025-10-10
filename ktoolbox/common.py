@@ -1974,7 +1974,7 @@ class Serial:
                     )
                     assert self._bin_buf.startswith(consumed_bytes)
                     logger.debug(
-                        f"serial[{self.port}]: found expected message {len(consumed_bytes)} bytes, {len(self._bin_buf) - len(consumed_bytes)} bytes remaning (took {time.monotonic() - start_timestamp:.4f} seconds)"
+                        f"serial[{self.port}]: found expected message {len(consumed_bytes)} bytes, {len(self._bin_buf) - len(consumed_bytes)} bytes remaining (took {time.monotonic() - start_timestamp:.4f} seconds)"
                     )
                     self._str_buf = buffer[end_idx:]
                     self._bin_buf = self._bin_buf[len(consumed_bytes) :]
@@ -1985,7 +1985,7 @@ class Serial:
                 self._str_buf = None
                 self._bin_buf = self._bin_buf[consumed_len:]
                 logger.debug(
-                    f"serial[{self.port}]: drop excess {consumed_len} bytes, {len(self._bin_buf)} bytes remaning"
+                    f"serial[{self.port}]: drop excess {consumed_len} bytes, {len(self._bin_buf)} bytes remaining"
                 )
 
             remaining_time = None
