@@ -43,8 +43,12 @@ class K8sClient:
         self.kubeconfig = kubeconfig
 
     @staticmethod
-    def _get_oc_cmd(cmd: Union[str, Iterable[str]]) -> list[str]:
+    def _get_oc_cmd(
+        cmd: Union[str, Iterable[str]], *, for_exec: bool = False
+    ) -> list[str]:
         if isinstance(cmd, str):
+            if for_exec:
+                return ["/bin/sh", "-c", cmd]
             return shlex.split(cmd)
         return list(cmd)
 
@@ -93,7 +97,7 @@ class K8sClient:
         namespace: typing.Optional[str] = None,
     ) -> host.Result:
         return self.oc(
-            ["exec", pod_name, "--", *self._get_oc_cmd(cmd)],
+            ["exec", pod_name, "--", *self._get_oc_cmd(cmd, for_exec=True)],
             may_fail=may_fail,
             die_on_error=die_on_error,
             namespace=namespace,
@@ -170,7 +174,7 @@ class K8sClient:
                 f"--image={test_image}",
                 f"node/{node_name}",
                 "--",
-                *self._get_oc_cmd(cmd),
+                *self._get_oc_cmd(cmd, for_exec=True),
             ],
             may_fail=may_fail,
             die_on_error=die_on_error,
