@@ -25,9 +25,9 @@ the [gh-pages](https://github.com/thom311/ktoolbox/commits/gh-pages/) branch.
 
 You can install via:
 
-  - `pip install git+https://github.com/thom311/ktoolbox@$VERSION`
-  - `pip install https://thom311.github.io/ktoolbox/wheels/$WHEEL`
-  - `pip install --find-links=https://thom311.github.io/ktoolbox/wheels 'ktoolbox>=0.8'`
+  - `pip install --force-reinstall git+https://github.com/thom311/ktoolbox@$VERSION`
+  - `pip install --force-reinstall https://thom311.github.io/ktoolbox/wheels/$WHEEL`
+  - `pip install --force-reinstall --no-index --find-links=https://thom311.github.io/ktoolbox/wheels 'ktoolbox>=0.8'`
 
 The benefit of using wheel files is that it's cheaper to install and you can
 copy the wheel file around.
@@ -37,7 +37,7 @@ sum to cryptographically ensure what is installed.
 
 Alternatively, you can also use (e.g.)
 
-  - `pip install https://raw.githubusercontent.com/thom311/ktoolbox/cb38f23eb271cbbe38ea83357132362eade61c49/wheels/140.7e3728001e18/ktoolbox-0.8.0-py3-none-any.whl`
+  - `pip install --force-reinstall https://raw.githubusercontent.com/thom311/ktoolbox/cb38f23eb271cbbe38ea83357132362eade61c49/wheels/140.7e3728001e18/ktoolbox-0.8.0-py3-none-any.whl`
 
 which has the benefit that the git commit sha cryptographically refers to the
 content of a known commit on the `gh-pages` branch. You still have no guarantee
