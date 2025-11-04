@@ -43,3 +43,23 @@ which has the benefit that the git commit sha cryptographically refers to the
 content of a known commit on the `gh-pages` branch. You still have no guarantee
 that the content of that wheel file is something in particular. But you have the
 guarantee that this is served from a known commit on the `gh-pages` branch.
+
+Environment Variables
+=====================
+
+ktoolbox honors some environment variables. Find out which via
+`git grep -w getenv_config`.
+
+Variables:
+  - `KTOOLBOX_CURRENT_HOST` (overwrites `ktoolbox.common.get_current_host()`).
+
+Logging related for loggers configured by `ktoolbox.common.log_config_logger()`:
+  - `KTOOLBOX_ALL_LOGGERS` (enable logging for all python loggers)
+  - `KTOOLBOX_LOGFILE` (write log output also to file, including a level)
+  - `KTOOLBOX_LOGLEVEL` (overwrite the default level)
+  - `KTOOLBOX_LOGSTDOUT` (log to stdout instead of stderr)
+  - `KTOOLBOX_LOGTAG` (add a tag/prefix to each message)
+
+Other:
+  - `KUBECONFIG` (fallback for `ktoolbox.k8sClient.K8sClient()`)
+  - `USER` (fallback ssh user login for `ktoolbox.host.RemoteHost()`)

@@ -2104,6 +2104,8 @@ def log_all_loggers() -> bool:
     # and configures only certain loggers ("myapp", "ktoolbox"). If
     # KTOOLBOX_ALL_LOGGERS is set to True, then instead the root logger
     # will be configured which may affect also other python modules.
+    #
+    # This is for loggers configured by ktoolbox.common.log_config_logger().
     return str_to_bool(getenv_config("KTOOLBOX_ALL_LOGGERS"), False)
 
 
@@ -2114,6 +2116,8 @@ def log_default_level() -> Optional[int]:
     # "KTOOLBOX_LOGLEVEL" environment variable. If still unspecified, the
     # default is determined by the main application that calls
     # common.log_config_logger().
+    #
+    # This is for loggers configured by ktoolbox.common.log_config_logger().
     v = getenv_config("KTOOLBOX_LOGLEVEL")
     if v is not None:
         return _log_parse_level_str(v)
@@ -2178,6 +2182,14 @@ def _env_get_ktoolbox_logfile_parse(
 
 @functools.cache
 def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
+    # KTOOLBOX_LOGFILE can additionally redirect the logging output to file.
+    # Format: "[LEVEL:][+=]FILENAME"
+    #  - [LEVEL:] is optional to overwrite the level with which to log to file
+    #  - [+=] is optional to either append or overwrite the file (defaults to append).
+    #  - FILENAME: the filename. Supports % substitutions like core_pattern, notably
+    #      "%p", "%h", "%t", "%a", "%%".
+    #
+    # This is for loggers configured by ktoolbox.common.log_config_logger().
     v = getenv_config("KTOOLBOX_LOGFILE")
     if not v:
         return None
@@ -2191,6 +2203,11 @@ def _env_get_ktoolbox_logfile() -> Optional[tuple[str, Optional[int], bool]]:
 
 @functools.cache
 def _env_get_ktoolbox_logstdout() -> bool:
+    # By default, we log to stderr. By setting environment variable
+    # "KTOOLBOX_LOGSTDOUT" to either a true-value or "out" or "stdout", we log
+    # to stdout instead.
+    #
+    # This is for loggers configured by ktoolbox.common.log_config_logger().
     v = getenv_config("KTOOLBOX_LOGSTDOUT")
     if v:
         v = v.strip().lower()
@@ -2206,6 +2223,10 @@ def _env_get_ktoolbox_logstdout() -> bool:
 
 @functools.cache
 def _env_get_ktoolbox_logtag() -> str:
+    # Set "KTOOLBOX_LOGTAG" to prefix every log message with this tag.
+    # An additional whitespace is added.
+    #
+    # This is for loggers configured by ktoolbox.common.log_config_logger().
     v = getenv_config("KTOOLBOX_LOGTAG")
     if not v:
         return ""
@@ -2852,6 +2873,9 @@ def thread_list_join_all(
 
 @functools.cache
 def get_current_host() -> str:
+    # Set "KTOOLBOX_CURRENT_HOST" to overwrite the result of
+    # ktoolbox.common.get_current_host(). Otherwise, it is detected by calling
+    # `hostname -f`.
     chost = getenv_config("KTOOLBOX_CURRENT_HOST")
     if chost:
         return chost
