@@ -696,9 +696,15 @@ def json_parse_list(jstr: str, *, strict_parsing: bool = False) -> list[Any]:
 def json_dump(
     data: Any,
     file: Union[str, pathlib.Path, typing.IO[str]],
+    *,
+    indent: Optional[Union[int, str]] = 2,
 ) -> None:
     with use_or_open(file, mode="w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(
+            data,
+            f,
+            indent=indent,
+        )
         f.write("\n")
 
 
@@ -776,9 +782,16 @@ def dataclass_to_dict(obj: "DataclassInstance") -> dict[str, Any]:
     return typing.cast(dict[str, Any], serialize_enum(d))
 
 
-def dataclass_to_json(obj: "DataclassInstance") -> str:
+def dataclass_to_json(
+    obj: "DataclassInstance",
+    *,
+    indent: Optional[Union[int, str]] = None,
+) -> str:
     d = dataclass_to_dict(obj)
-    return json.dumps(d)
+    return json.dumps(
+        d,
+        indent=indent,
+    )
 
 
 # Takes a dataclass and the dict you want to convert from
