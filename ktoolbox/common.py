@@ -796,6 +796,22 @@ def dataclass_to_json(
     )
 
 
+def dataclass_to_file(
+    obj: "DataclassInstance",
+    file: Union[str, pathlib.Path, typing.IO[str]],
+    *,
+    indent: Optional[Union[int, str]] = 2,
+) -> None:
+    d = dataclass_to_dict(obj)
+    with use_or_open(file, mode="w") as f:
+        json.dump(
+            d,
+            f,
+            indent=indent,
+        )
+        f.write("\n")
+
+
 # Takes a dataclass and the dict you want to convert from
 # If your dataclass has a dataclass member, it handles that recursively
 def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
