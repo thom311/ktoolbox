@@ -925,7 +925,7 @@ def check_type(
 
     if actual_type is dict or actual_type is Mapping:
         args = typing.get_args(type_hint)
-        (arg_key, arg_val) = args
+        arg_key, arg_val = args
         return isinstance(value, dict) and all(
             check_type(k, arg_key) and check_type(v, arg_val) for k, v in value.items()
         )

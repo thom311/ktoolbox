@@ -4,7 +4,6 @@ import typing
 import random
 import logging
 
-
 T = typing.TypeVar("T")
 
 

@@ -27,7 +27,6 @@ from . import common
 
 from .common import FutureThread
 
-
 INTERNAL_ERROR_PREFIX = "Host.run(): "
 
 RETURNCODE_INTERNAL = 1024

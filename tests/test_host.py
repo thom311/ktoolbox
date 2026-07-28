@@ -22,7 +22,6 @@ import tstutil
 from tstutil import rnd_bool
 from tstutil import rnd_one_in
 
-
 common.log_config_logger(logging.DEBUG, "ktoolbox")
 
 

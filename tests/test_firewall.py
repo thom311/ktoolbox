@@ -10,12 +10,12 @@ def has_nft_cmd() -> bool:
 
 
 def test_nft_cmd_masquerade() -> None:
-    assert (
-        firewall.nft_data_masquerade_down(table_name="foo")
-        == """add table ip foo
+    s1 = firewall.nft_data_masquerade_down(table_name="foo")
+    s2 = """add table ip foo
 delete table ip foo
 """
-    )
+    assert s1 == s2
+
     assert (
         firewall.nft_data_masquerade_up(
             table_name="foo",

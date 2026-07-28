@@ -1698,13 +1698,13 @@ def test_json_dump() -> None:
         return buffer.getvalue()
 
     assert _dump(1) == "1\n"
-    assert (
-        _dump({"a": 5.5})
-        == """{
+
+    a1 = _dump({"a": 5.5})
+    a2 = """{
   "a": 5.5
 }
 """
-    )
+    assert a1 == a2
 
 
 def test_file_or_open(tmp_path: pathlib.Path) -> None:
