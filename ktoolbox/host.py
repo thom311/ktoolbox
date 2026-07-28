@@ -1006,13 +1006,13 @@ class LocalHost(Host):
             *,
             read_all: bool,
         ) -> None:
-            assert stream is not None
             if stream is pr.stdout:
                 is_stdout = True
             else:
                 assert stream is pr.stderr
                 is_stdout = False
             while True:
+                assert stream is not None
                 if read_all:
                     to_read, _, _ = select.select([stream], [], [], 0)
                     if not to_read:
@@ -1043,14 +1043,19 @@ class LocalHost(Host):
                     0.0, (terminate_kill_at_timestamp - time.monotonic())
                 )
 
-            to_read, _, _ = select.select(fds, [], [], select_timeout)
+            to_read, _, _ = select.select(
+                typing.cast(list[Union[typing.IO[bytes], int]], fds),
+                [],
+                [],
+                select_timeout,
+            )
 
             for stream in to_read:
                 if fd_cancellable is not None and stream == fd_cancellable:
                     fd_cancellable = None
                     terminate_state = 0
                     continue
-                _readlines(stream, read_all=False)
+                _readlines(typing.cast(typing.IO[bytes], stream), read_all=False)
 
             if terminate_state == 0:
                 terminate_state = 1

@@ -34,7 +34,7 @@ def render_data(
         contents,
         undefined=jinja2.StrictUndefined if strict_undefined else jinja2.Undefined,
     )
-    rendered = template.render(**a)
+    rendered: str = template.render(**a)
 
     if out_file is not None:
         with common.use_or_open(out_file, mode="w") as outFile:
