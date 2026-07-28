@@ -16,11 +16,10 @@ from typing import Union
 
 from ktoolbox import common
 from ktoolbox import host
+from ktoolbox import tstutil
 
-import tstutil
-
-from tstutil import rnd_bool
-from tstutil import rnd_one_in
+from ktoolbox.tstutil import rnd_bool
+from ktoolbox.tstutil import rnd_one_in
 
 common.log_config_logger(logging.DEBUG, "ktoolbox")
 

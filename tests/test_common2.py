@@ -10,8 +10,7 @@ from typing import Optional
 
 from ktoolbox import common
 from ktoolbox import host
-
-import tstutil
+from ktoolbox import tstutil
 
 
 def test_future_thread() -> None:

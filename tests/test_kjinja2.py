@@ -5,8 +5,7 @@ import pytest
 from typing import Any
 
 from ktoolbox import kjinja2
-
-import tstutil
+from ktoolbox import tstutil
 
 
 def test_render_data(tmp_path: pathlib.Path) -> None:
