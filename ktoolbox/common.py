@@ -773,6 +773,8 @@ def serialize_enum(
         return {k: serialize_enum(v) for k, v in data.items()}
     elif isinstance(data, list):
         return [serialize_enum(item) for item in data]
+    elif isinstance(data, tuple):
+        return tuple(serialize_enum(item) for item in data)
     else:
         return data
 
