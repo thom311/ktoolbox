@@ -2874,21 +2874,13 @@ def thread_list_join_all(
 @functools.cache
 def get_current_host() -> str:
     # Set "KTOOLBOX_CURRENT_HOST" to overwrite the result of
-    # ktoolbox.common.get_current_host(). Otherwise, it is detected by calling
-    # `hostname -f`.
+    # ktoolbox.common.get_current_host(). Otherwise, detect the current
+    # hostname.
     chost = getenv_config("KTOOLBOX_CURRENT_HOST")
     if chost:
         return chost
 
-    from . import host
-
-    res = host.local.run(
-        ("hostname", "-f"),
-        log_level_fail=logging.ERROR,
-    )
-    if res.success and (c := res.out.strip()):
-        return c
-    raise RuntimeError(f"Failure detecting current hostname: {res}")
+    return socket.getfqdn()
 
 
 def argparse_regex_type(value: str) -> re.Pattern[str]:
