@@ -14,6 +14,7 @@ import threading
 import typing
 
 from collections.abc import Iterable
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any
 from typing import Optional
@@ -445,6 +446,40 @@ def test_dataclass_tofrom_dict() -> None:
     assert common.dataclass_from_dict(C11, {"lst": [{"x": 1}]}) == c11
     assert common.dataclass_from_dict(C11, {"lst": ({"x": 1},)}) == c11
     assert common.dataclass_from_dict(C11, json.loads('{"lst": [{"x": 1}]}')) == c11
+
+    @common.strict_dataclass
+    @dataclasses.dataclass
+    class C12_inner:
+        name: str
+
+        @staticmethod
+        def _dataclass_from_dict_select_class(
+            data: Mapping[str, Any],
+        ) -> type["C12_inner"]:
+            if "field2" in data:
+                return C12_inner_2
+            return C12_inner
+
+    @common.strict_dataclass
+    @dataclasses.dataclass
+    class C12_inner_2(C12_inner):
+        field2: float
+
+    @common.strict_dataclass
+    @dataclasses.dataclass
+    class C12:
+        lst: tuple[C12_inner, ...]
+
+    c12 = C12(lst=(C12_inner("xname"), C12_inner_2("xname2", 44.5)))
+    c12_s = {
+        "lst": (
+            {"name": "xname"},
+            {"name": "xname2", "field2": 44.5},
+        )
+    }
+
+    assert common.dataclass_to_dict(c12) == c12_s
+    assert common.dataclass_from_dict(C12, c12_s) == c12
 
 
 def test_iter_get_first() -> None:

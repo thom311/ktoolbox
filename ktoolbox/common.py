@@ -826,6 +826,21 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
             raise ValueError(
                 f"requires a strdict to in initialize dataclass {cls} but has key {type(k)}"
             )
+
+    select_class: Optional[Callable[[Mapping[str, Any]], type[T]]]
+    select_class = getattr(cls, "_dataclass_from_dict_select_class", None)
+    if select_class is not None:
+        real_cls = select_class(data)
+        if not issubclass(real_cls, cls):
+            raise AssertionError(
+                f"dataclass_from_dict() suggested to create incomptible class {real_cls} for {cls}"
+            )
+        cls = real_cls
+        if not is_dataclass(cls):
+            raise AssertionError(
+                f"dataclass_from_dict() suggested to create non-dataclass {cls}"
+            )
+
     data = dict(data)
     create_kwargs = {}
     for field in fields(cls):
