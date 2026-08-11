@@ -421,6 +421,12 @@ def path_norm(
     """
     Normalize a path while preserving symbolic links and other specific rules.
 
+    This only operates on the input path text without checking the file
+    system. It also does not change the meaning of the path (unlike
+    os.path.normpath(), see WARNING below). Instead, it normalizes ambigous parts
+    like duplicated separators and "/./" while preserving what would happen
+    if you tried to open that path directly.
+
     Parameters:
     path (str): The path to normalize. None is allowed and results in None.
       pathlib.Path arguments are allowed and the result will also be a Path.
@@ -437,11 +443,16 @@ def path_norm(
     str: The normalized path.
 
     Notes:
-    - This function is similar to `os.path.normpath()`, but with key differences:
+    - This function is similar to `os.path.normpath()` and both purely operate
+      on the input string. But there are key differences:
       - Unlike `normpath()`, this function **does not remove `..`** components,
         preserving their meaning (important when symbolic links are involved).
       - `normpath()` keeps leading `//`, which is undesired in most cases. This
         function collapses all duplicate slashes into a single `/`.
+      - WARNING: path_norm() does not change the meaning of the path. That is
+        unlike os.path.normpath() which normalized ".." to prevent path
+        traversal via symlink. path_norm() just strips out redundant/ambigious parts of
+        the path, it still points to the same file (including, following symlinks).
     """
     if path is None:
         return typing.cast(TPathNormPath, None)
