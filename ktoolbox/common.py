@@ -538,6 +538,33 @@ def use_or_open(
             f.close()
 
 
+def atomic_write(
+    path: PathType,
+    data: Union[str, bytes],
+) -> None:
+    import tempfile
+
+    directory = os.path.dirname(path) or "."
+    tmp: Optional[PathType]
+    fd: Optional[int]
+    fd, tmp = tempfile.mkstemp(dir=directory)
+    try:
+        mode = "w" if isinstance(data, str) else "wb"
+        with os.fdopen(fd, mode) as f:
+            fd = None
+            f.write(data)
+        os.replace(tmp, path)
+        tmp = None
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except FileNotFoundError:
+                pass
+
+
 def enum_convert(
     enum_type: type[E],
     value: Any,
