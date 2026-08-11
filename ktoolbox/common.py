@@ -1879,8 +1879,10 @@ def etc_hosts_update_file(
         new_entries,
     )
 
-    with open(filename, "wb") as f:
-        f.write(new_content.encode("utf-8", errors="surrogateescape"))
+    atomic_write(
+        filename,
+        new_content.encode("utf-8", errors="surrogateescape"),
+    )
 
     return new_content
 
