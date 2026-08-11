@@ -678,6 +678,12 @@ def test_etc_hosts_update() -> None:
 """
     )
 
+    with pytest.raises(ValueError):
+        common.etc_hosts_update_data(
+            "127.0.0.1 localhost\n",
+            {"evil": ("1.2.3.4\n0.0.0.0 update.alpitronic.it", None)},
+        )
+
 
 def _pargs(
     arg: Union[common._MISSING_TYPE, Optional[Any]] = common.MISSING,

@@ -1801,7 +1801,12 @@ def etc_hosts_update_data(
             s_aliases = f" {' '.join(aliases)}"
         else:
             s_aliases = ""
-        return f"{ipaddr} {name}{s_aliases}"
+        line = f"{ipaddr} {name}{s_aliases}"
+
+        if "\n" in line or "\r" in line or not lineregex.match(line):
+            raise ValueError("Invalid hosts entry")
+
+        return line
 
     result = []
     for line in content.splitlines():
