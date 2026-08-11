@@ -997,19 +997,32 @@ def test_structparse_pop_str_empty() -> None:
             check_ctx=_check1,
         )
 
-    assert (
+    with pytest.raises(ValueError):
         common.structparse_pop_str_name(
             _pargs("hi"),
             check_regex="i",
         )
+
+    assert (
+        common.structparse_pop_str_name(
+            _pargs("hi"),
+            check_regex="hi",
+        )
         == "hi"
     )
+
+    with pytest.raises(ValueError):
+        common.structparse_pop_str(
+            _pargs("hi"),
+            check=lambda val: True,
+            check_regex="h",
+        )
 
     assert (
         common.structparse_pop_str(
             _pargs("hi"),
             check=lambda val: True,
-            check_regex="h",
+            check_regex="h[i]",
         )
         == "hi"
     )

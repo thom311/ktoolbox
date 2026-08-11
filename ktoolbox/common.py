@@ -1373,7 +1373,7 @@ def structparse_pop_str(
 
     if check_regex is not None:
         pattern_re = as_regex(check_regex)
-        if not pattern_re.search(v):
+        if not pattern_re.fullmatch(v):
             raise pargs.value_error(
                 f"does not match pattern {repr(pattern_re.pattern)}"
             )
