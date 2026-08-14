@@ -952,12 +952,38 @@ def dataclass_from_dict(cls: type[T], data: dict[str, Any]) -> T:
         create_kwargs[field.name] = value_converted
 
     if data:
-        raise ValueError(
-            f"There are left over keys {list(data)} to create dataclass {cls}"
+        check_extra_fields: Optional[
+            Union[
+                bool,
+                Callable[
+                    [
+                        type[T],
+                        dict[str, Any],
+                        dict[str, Any],
+                    ],
+                    None,
+                ],
+            ]
+        ]
+
+        check_extra_fields = getattr(
+            cls,
+            "_dataclass_from_dict_check_extra_fields",
+            None,
         )
 
-    result: Any = cls(**create_kwargs)
-    return typing.cast(T, result)
+        if isinstance(check_extra_fields, bool) and check_extra_fields:
+            check_extra_fields = None
+
+        if check_extra_fields is None:
+            raise ValueError(
+                f"There are left over keys {list(data)} to create dataclass {cls}"
+            )
+
+        if not isinstance(check_extra_fields, bool):
+            check_extra_fields(cls, create_kwargs, data)
+
+    return cls(**create_kwargs)
 
 
 def dataclass_from_json(cls: type[T], jsondata: str) -> T:
